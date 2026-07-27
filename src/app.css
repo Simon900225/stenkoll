@@ -1,0 +1,49 @@
+:root {
+	--ink: #1c2419;
+	--chalk: #eef1e8;
+	--panel: #f4f6ef;
+	--moss: #6b8f71;
+	--moss-deep: #2f4a34;
+	--amber: #c4783a;
+	--muted: #5c6758;
+	--line: color-mix(in srgb, var(--ink) 12%, transparent);
+	--font-display: 'Bricolage Grotesque', Georgia, serif;
+	--font-body: 'Figtree', system-ui, sans-serif;
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+	font-family: var(--font-body);
+	background:
+		radial-gradient(ellipse 120% 80% at 10% -20%, #d4e0c8 0%, transparent 55%),
+		radial-gradient(ellipse 90% 60% at 100% 0%, #c5b8a0 0%, transparent 45%),
+		linear-gradient(165deg, #e8ebe0 0%, #d9dece 40%, #cfd6c4 100%);
+	color: var(--ink);
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+}
+
+/* MapLibre attribution stays readable */
+.maplibregl-ctrl-attrib {
+	font-size: 10px !important;
+	background: rgb(244 246 239 / 0.85) !important;
+}
