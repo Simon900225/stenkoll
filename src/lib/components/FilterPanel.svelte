@@ -37,7 +37,7 @@
 	</header>
 
 	{#if usingSeedData}
-		<p class="seed-note">Visar seed-data (Hallandsåsen). Koppla Supabase för live-data.</p>
+		<p class="seed-note">Supabase saknas. Konfigurera <code>.env</code> för live-data.</p>
 	{/if}
 
 	<label class="field">

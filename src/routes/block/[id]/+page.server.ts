@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createSupabaseServerClient, isSupabaseConfigured } from '$lib/supabase/client';
-import { getSeedBlocks, fornsokUrl } from '$lib/blocks';
+import { fornsokUrl } from '$lib/blocks';
 import { fail } from '@sveltejs/kit';
 import type { Block, Photo } from '$lib/types';
 
@@ -9,15 +9,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const { user, usingSeedData } = await parent();
 
 	if (!isSupabaseConfigured()) {
-		const block = getSeedBlocks().find((b) => b.id === params.id);
-		if (!block) error(404, 'Blocket hittades inte');
-		return {
-			block,
-			photos: [] as (Photo & { url: string })[],
-			fornsokLink: fornsokUrl(block.fornsok_id),
-			user,
-			usingSeedData: true
-		};
+		error(503, 'Supabase är inte konfigurerat.');
 	}
 
 	const supabase = createSupabaseServerClient(cookies);
@@ -31,17 +23,9 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 
 	if (blockError) error(500, blockError.message);
 
-	let resolved = block as Block | null;
+	const resolved = block as Block | null;
 	if (!resolved) {
-		resolved = getSeedBlocks().find((b) => b.id === params.id) ?? null;
-		if (!resolved) error(404, 'Blocket hittades inte');
-		return {
-			block: resolved,
-			photos: [],
-			fornsokLink: fornsokUrl(resolved.fornsok_id),
-			user,
-			usingSeedData: true
-		};
+		error(404, 'Blocket hittades inte');
 	}
 
 	const { data: photos } = await supabase

@@ -1,12 +1,8 @@
 import type { Cookies } from '@sveltejs/kit';
 import {
-	filterBlocks,
-	getSeedBlocks,
-	inBBox,
 	MARKER_COLUMNS,
 	BLOCK_DETAIL_COLUMNS,
 	padBBox,
-	toMarker,
 	VIEWPORT_BLOCK_LIMIT,
 	municipalitiesFrom
 } from '$lib/blocks';
@@ -49,24 +45,13 @@ export function bboxFromSearchParams(params: URLSearchParams): MapBBox | null {
 	return { west, south, east, north };
 }
 
-function querySeedViewport(bbox: MapBBox, filters: BlockFilters): ViewportBlocksResult {
-	const padded = padBBox(bbox);
-	const matched = filterBlocks(getSeedBlocks(), filters).filter((b) => inBBox(b, padded));
-	const truncated = matched.length > VIEWPORT_BLOCK_LIMIT;
-	return {
-		blocks: matched.slice(0, VIEWPORT_BLOCK_LIMIT).map(toMarker),
-		truncated,
-		usingSeedData: true
-	};
-}
-
 export async function queryViewportBlocks(
 	cookies: Cookies,
 	bbox: MapBBox,
 	filters: BlockFilters
 ): Promise<ViewportBlocksResult> {
 	if (!isSupabaseConfigured()) {
-		return querySeedViewport(bbox, filters);
+		return { blocks: [], truncated: false, usingSeedData: true };
 	}
 
 	const padded = padBBox(bbox);
@@ -94,7 +79,7 @@ export async function queryViewportBlocks(
 	const { data, error } = await query;
 
 	if (error || !data) {
-		return querySeedViewport(bbox, filters);
+		return { blocks: [], truncated: false, usingSeedData: false };
 	}
 
 	const truncated = data.length > VIEWPORT_BLOCK_LIMIT;
@@ -107,7 +92,7 @@ export async function queryViewportBlocks(
 
 export async function queryBlockById(cookies: Cookies, id: string): Promise<Block | null> {
 	if (!isSupabaseConfigured()) {
-		return getSeedBlocks().find((b) => b.id === id) ?? null;
+		return null;
 	}
 
 	const supabase = createSupabaseServerClient(cookies);
@@ -118,7 +103,7 @@ export async function queryBlockById(cookies: Cookies, id: string): Promise<Bloc
 		.maybeSingle();
 
 	if (error || !data) {
-		return getSeedBlocks().find((b) => b.id === id) ?? null;
+		return null;
 	}
 
 	return data as Block;
@@ -129,10 +114,7 @@ export async function queryMunicipalities(cookies: Cookies): Promise<{
 	usingSeedData: boolean;
 }> {
 	if (!isSupabaseConfigured()) {
-		return {
-			municipalities: municipalitiesFrom(getSeedBlocks()),
-			usingSeedData: true
-		};
+		return { municipalities: [], usingSeedData: true };
 	}
 
 	const supabase = createSupabaseServerClient(cookies);
@@ -143,10 +125,7 @@ export async function queryMunicipalities(cookies: Cookies): Promise<{
 		.limit(5000);
 
 	if (error || !data?.length) {
-		return {
-			municipalities: municipalitiesFrom(getSeedBlocks()),
-			usingSeedData: true
-		};
+		return { municipalities: [], usingSeedData: false };
 	}
 
 	return {

@@ -1,5 +1,4 @@
 import type { Block, BlockFilters, BlockMarker, BlockSource, MapBBox } from '$lib/types';
-import seedBlocks from '$lib/data/seed-blocks.json';
 
 export const HALLANDSASEN_CENTER: [number, number] = [13.0, 56.3];
 export const DEFAULT_ZOOM = 10;
@@ -11,10 +10,6 @@ export const MARKER_COLUMNS =
 
 export const BLOCK_DETAIL_COLUMNS =
 	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, county, municipality, created_by, created_at' as const;
-
-export function getSeedBlocks(): Block[] {
-	return seedBlocks as Block[];
-}
 
 export function toMarker(block: Block): BlockMarker {
 	return {
@@ -92,8 +87,6 @@ export function scoreColor(score: number | null): string {
 
 export function fornsokUrl(fornsokId: string | null): string | null {
 	if (!fornsokId) return null;
-	// Real Fornsök IDs are UUIDs; seed ids are placeholders
-	if (fornsokId.startsWith('seed-')) return 'https://app.raa.se/open/fornsok/';
 	return `https://app.raa.se/open/fornsok/lamning/${fornsokId}`;
 }
 
