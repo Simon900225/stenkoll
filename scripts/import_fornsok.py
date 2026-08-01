@@ -28,7 +28,18 @@ load_dotenv(ROOT / ".env")
 HALLANDSASEN_BBOX = (12.75, 56.20, 13.30, 56.40)
 
 # Match if any keyword appears in key text fields (substring, case-insensitive).
-KEYWORDS = ("flyttblock", "jättekast", "grotta", "klippvägg")
+KEYWORDS = (
+    "flyttblock",
+    "jättekast",
+    "grotta",
+    "klippvägg",
+    # Phrases: catches "Block med namn, …" that lacks flyttblock/jättekast.
+    # Bare "block" is too noisy (rösen/stensättningar say "0,3 m st block").
+    "block med namn",
+    "block med tradition",
+    "stenblock med namn",
+    "stenblock med tradition",
+)
 
 SCORE_SYSTEM = """Du är en erfaren boulderer som bedömer svenska flyttblock utifrån
 fornlämningsbeskrivningar. Ge en poäng 1–5 för hur sannolikt det är att objektet

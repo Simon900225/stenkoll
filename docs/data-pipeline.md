@@ -25,8 +25,13 @@ Behåller lämningar där något av orden nedan förekommer (substring, case-ins
 - `jättekast`
 - `grotta`
 - `klippvägg`
+- `block med namn`
+- `block med tradition`
+- `stenblock med namn`
+- `stenblock med tradition`
 
-`häll` ingår **inte** (för många hällristningar/hällkistor).
+`häll` och bare `block` ingår **inte** (hällristningar/hällkistor respektive rösen/stensättningar med "0,3 m st block").
+Fraserna fångar Naturföremål som "Block med namn, ca 12 m l…" utan `flyttblock` i texten.
 
 Default bbox: Hallandsåsen (`12.75,56.20 — 13.30,56.40`). Använd `--no-bbox` för hela Sverige.
 
