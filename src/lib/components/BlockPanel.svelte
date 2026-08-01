@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { Block } from '$lib/types';
-	import { fornsokUrl, scoreColor } from '$lib/blocks';
+	import {
+		fornsokUrl,
+		gokartorUrl,
+		googleMapsUrl,
+		lantmaterietFlygUrl,
+		scoreColor
+	} from '$lib/blocks';
 
 	type Props = {
 		block: Block | null;
@@ -10,6 +16,15 @@
 	let { block, onclose }: Props = $props();
 
 	const url = $derived(block ? fornsokUrl(block.fornsok_id) : null);
+	const maps = $derived(
+		block
+			? {
+					google: googleMapsUrl(block.lat, block.lng),
+					flyg: lantmaterietFlygUrl(block.lat, block.lng),
+					gokartor: gokartorUrl(block.lat, block.lng)
+				}
+			: null
+	);
 </script>
 
 {#if block}
@@ -54,6 +69,14 @@
 				<a class="btn" href={url} target="_blank" rel="noopener noreferrer">Fornsök ↗</a>
 			{/if}
 		</div>
+
+		{#if maps}
+			<nav class="map-links" aria-label="Öppna i karta">
+				<a href={maps.google} target="_blank" rel="noopener noreferrer">Google Maps</a>
+				<a href={maps.flyg} target="_blank" rel="noopener noreferrer">Flygkarta</a>
+				<a href={maps.gokartor} target="_blank" rel="noopener noreferrer">GoKartor</a>
+			</nav>
+		{/if}
 	</aside>
 {/if}
 
@@ -166,6 +189,24 @@
 		display: flex;
 		gap: 0.5rem;
 		margin-top: 1rem;
+	}
+
+	.map-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.85rem;
+		margin-top: 0.75rem;
+		font-size: 0.78rem;
+	}
+
+	.map-links a {
+		color: var(--moss-deep);
+		text-decoration: none;
+		font-weight: 600;
+	}
+
+	.map-links a:hover {
+		text-decoration: underline;
 	}
 
 	.btn {

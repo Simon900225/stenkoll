@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { scoreColor } from '$lib/blocks';
+	import { gokartorUrl, googleMapsUrl, lantmaterietFlygUrl, scoreColor } from '$lib/blocks';
 
 	let { data, form } = $props();
 
 	const block = $derived(data.block);
 	const color = $derived(scoreColor(block.climb_score));
+	const maps = $derived({
+		google: googleMapsUrl(block.lat, block.lng),
+		flyg: lantmaterietFlygUrl(block.lat, block.lng),
+		gokartor: gokartorUrl(block.lat, block.lng)
+	});
 </script>
 
 <svelte:head>
@@ -51,6 +56,18 @@
 			{/if}
 
 			<p class="coords">{block.lat.toFixed(5)}, {block.lng.toFixed(5)}</p>
+
+			<nav class="map-links" aria-label="Öppna i karta">
+				<a class="ext" href={maps.google} target="_blank" rel="noopener noreferrer"
+					>Google Maps ↗</a
+				>
+				<a class="ext" href={maps.flyg} target="_blank" rel="noopener noreferrer"
+					>Flygkarta ↗</a
+				>
+				<a class="ext" href={maps.gokartor} target="_blank" rel="noopener noreferrer"
+					>GoKartor ↗</a
+				>
+			</nav>
 
 			{#if data.fornsokLink}
 				<p>
@@ -209,6 +226,13 @@
 		font-size: 0.85rem;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
+	}
+
+	.map-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1rem;
+		margin: 0.65rem 0 0;
 	}
 
 	.ext {

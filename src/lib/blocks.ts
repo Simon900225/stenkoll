@@ -90,6 +90,73 @@ export function fornsokUrl(fornsokId: string | null): string | null {
 	return `https://app.raa.se/open/fornsok/lamning/${fornsokId}`;
 }
 
+export function googleMapsUrl(lat: number, lng: number): string {
+	return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+/** Orienteringskarta / laser (kartor.gokartor.se). */
+export function gokartorUrl(lat: number, lng: number, zoom = 13): string {
+	return `https://kartor.gokartor.se/#${zoom}/${lat.toFixed(4)}/${lng.toFixed(4)}`;
+}
+
+/**
+ * Lantmäteriet Min Karta, flygbild. Requires SWEREF99 TM (EPSG:3006) easting/northing.
+ * Format: …/plats/3006/v2.0/?e=…&n=…&z=12&mapprofile=flygbild&layers=[["7"]]
+ */
+export function lantmaterietFlygUrl(lat: number, lng: number, zoom = 12): string {
+	const { e, n } = wgs84ToSweref99tm(lat, lng);
+	const layers = encodeURIComponent('[["7"]]');
+	return `https://minkarta.lantmateriet.se/plats/3006/v2.0/?e=${Math.round(e)}&n=${Math.round(n)}&z=${zoom}&mapprofile=flygbild&layers=${layers}`;
+}
+
+/** WGS84 (EPSG:4326) → SWEREF99 TM (EPSG:3006) via Transverse Mercator / UTM zone 33. */
+export function wgs84ToSweref99tm(latDeg: number, lngDeg: number): { e: number; n: number } {
+	const a = 6378137.0;
+	const f = 1 / 298.257222101;
+	const e2 = f * (2 - f);
+	const ep2 = e2 / (1 - e2);
+	const k0 = 0.9996;
+	const lon0 = (15 * Math.PI) / 180;
+	const FE = 500_000;
+	const FN = 0;
+
+	const lat = (latDeg * Math.PI) / 180;
+	const lon = (lngDeg * Math.PI) / 180;
+	const sinLat = Math.sin(lat);
+	const cosLat = Math.cos(lat);
+	const tanLat = Math.tan(lat);
+
+	const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+	const T = tanLat * tanLat;
+	const C = ep2 * cosLat * cosLat;
+	const A = (lon - lon0) * cosLat;
+	const M =
+		a *
+		((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * lat -
+			((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * lat) +
+			((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * lat) -
+			((35 * e2 ** 3) / 3072) * Math.sin(6 * lat));
+
+	const e =
+		FE +
+		k0 *
+			N *
+			(A +
+				((1 - T + C) * A ** 3) / 6 +
+				((5 - 18 * T + T ** 2 + 72 * C - 58 * ep2) * A ** 5) / 120);
+	const n =
+		FN +
+		k0 *
+			(M +
+				N *
+					tanLat *
+					(A ** 2 / 2 +
+						((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24 +
+						((61 - 58 * T + T ** 2 + 600 * C - 330 * ep2) * A ** 6) / 720));
+
+	return { e, n };
+}
+
 export function defaultFilters(): BlockFilters {
 	return {
 		// 0 = include unscored imports (climb_score null treated as 0)
