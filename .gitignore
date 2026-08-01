@@ -28,3 +28,5 @@ scripts/**/__pycache__/
 *.gpkg
 data/
 scripts/scoring_batches/
+
+/supabase
