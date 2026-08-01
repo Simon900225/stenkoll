@@ -98,7 +98,8 @@
 			el.style.setProperty('--marker-color', scoreColor(score));
 			el.dataset.selected = refs.selectedId === block.id ? 'true' : 'false';
 			el.dataset.source = block.source;
-			el.innerHTML = `<span>${score ?? '?'}</span>`;
+			// Inner visual so scale transitions never fight MapLibre's position transform.
+			el.innerHTML = `<span class="boulder-marker-visual">${score ?? '?'}</span>`;
 			el.addEventListener('click', (e) => {
 				e.stopPropagation();
 				refs.onselect?.(block);
@@ -233,40 +234,46 @@
 		background: transparent;
 		cursor: pointer;
 		filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
-		transition:
-			transform 0.2s ease,
-			filter 0.2s ease;
+		transition: filter 0.2s ease;
 	}
 
-	.map-wrap :global(.boulder-marker::before) {
+	.map-wrap :global(.boulder-marker-visual) {
+		position: relative;
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		padding-top: 2px;
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 0.75rem;
+		line-height: 1.1;
+		color: #1a1f18;
+		transform-origin: bottom center;
+		transition: transform 0.2s ease;
+	}
+
+	.map-wrap :global(.boulder-marker-visual::before) {
 		content: '';
 		position: absolute;
 		inset: 0 2px 6px;
 		background: var(--marker-color, #6b8f71);
 		clip-path: polygon(50% 100%, 0 0, 100% 0);
 		border-radius: 2px 2px 0 0;
-	}
-
-	.map-wrap :global(.boulder-marker span) {
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 22px;
-		font-family: var(--font-display);
-		font-weight: 700;
-		font-size: 0.75rem;
-		color: #1a1f18;
-		z-index: 1;
+		z-index: -1;
 	}
 
 	.map-wrap :global(.boulder-marker[data-selected='true']) {
-		transform: scale(1.25);
 		filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.45));
 		z-index: 2;
 	}
 
-	.map-wrap :global(.boulder-marker[data-source='user']::after) {
+	.map-wrap :global(.boulder-marker[data-selected='true'] .boulder-marker-visual) {
+		transform: scale(1.25);
+	}
+
+	.map-wrap :global(.boulder-marker[data-source='user'] .boulder-marker-visual::after) {
 		content: '';
 		position: absolute;
 		top: 2px;
@@ -276,10 +283,9 @@
 		border-radius: 50%;
 		background: var(--chalk);
 		border: 1px solid var(--ink);
-		z-index: 2;
 	}
 
-	.map-wrap :global(.boulder-marker:hover) {
+	.map-wrap :global(.boulder-marker:hover .boulder-marker-visual) {
 		transform: scale(1.12);
 	}
 </style>
