@@ -19,6 +19,7 @@ export type Block = {
 	size_source: 'parsed' | 'llm' | 'manual' | null;
 	county: string | null;
 	municipality: string | null;
+	has_photo: boolean;
 	created_by: string | null;
 	created_at: string;
 	updated_at?: string;
@@ -39,12 +40,15 @@ export type Profile = {
 	created_at: string;
 };
 
+export type PhotoFilter = 'all' | 'with' | 'without';
+
 export type BlockFilters = {
 	minScore: number;
 	minHeight: number;
 	minArea: number;
 	sources: BlockSource[];
 	municipality: string;
+	photoFilter: PhotoFilter;
 };
 
 /** Slim marker payload for viewport queries (no long text fields). */
@@ -63,6 +67,7 @@ export type BlockMarker = Pick<
 	| 'area_m2'
 	| 'county'
 	| 'municipality'
+	| 'has_photo'
 >;
 
 export type MapBBox = {
@@ -94,6 +99,7 @@ type Tables = {
 			size_source?: 'parsed' | 'llm' | 'manual' | null;
 			county?: string | null;
 			municipality?: string | null;
+			has_photo?: boolean;
 			created_by?: string | null;
 			created_at?: string;
 			updated_at?: string;

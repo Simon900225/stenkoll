@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BlockFilters, BlockSource } from '$lib/types';
+	import type { BlockFilters, BlockSource, PhotoFilter } from '$lib/types';
 
 	type Props = {
 		filters: BlockFilters;
@@ -118,6 +118,22 @@
 			{#each municipalities as m (m)}
 				<option value={m}>{m}</option>
 			{/each}
+		</select>
+	</label>
+
+	<label class="field">
+		<span>Bild</span>
+		<select
+			value={filters.photoFilter}
+			onchange={(e) =>
+				onchange?.({
+					...filters,
+					photoFilter: e.currentTarget.value as PhotoFilter
+				})}
+		>
+			<option value="all">Alla</option>
+			<option value="with">Med bild</option>
+			<option value="without">Utan bild</option>
 		</select>
 	</label>
 

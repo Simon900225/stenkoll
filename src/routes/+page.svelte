@@ -30,7 +30,8 @@
 			minScore: String(f.minScore),
 			minHeight: String(f.minHeight),
 			minArea: String(f.minArea),
-			sources: f.sources.join(',')
+			sources: f.sources.join(','),
+			photoFilter: f.photoFilter
 		});
 		if (f.municipality) params.set('municipality', f.municipality);
 

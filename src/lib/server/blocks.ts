@@ -24,6 +24,11 @@ function parseSources(raw: string | null): Block['source'][] {
 	return parts.length ? parts : ['fornsok', 'user'];
 }
 
+function parsePhotoFilter(raw: string | null): BlockFilters['photoFilter'] {
+	if (raw === 'with' || raw === 'without') return raw;
+	return 'all';
+}
+
 export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
 	const minScore = Number(params.get('minScore') ?? '0');
 	const minHeight = Number(params.get('minHeight') ?? '0');
@@ -33,7 +38,8 @@ export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
 		minHeight: Number.isFinite(minHeight) ? Math.max(0, minHeight) : 0,
 		minArea: Number.isFinite(minArea) ? Math.max(0, minArea) : 0,
 		sources: parseSources(params.get('sources')),
-		municipality: params.get('municipality')?.trim() ?? ''
+		municipality: params.get('municipality')?.trim() ?? '',
+		photoFilter: parsePhotoFilter(params.get('photoFilter'))
 	};
 }
 
@@ -84,6 +90,11 @@ export async function queryViewportBlocks(
 
 	if (filters.municipality) {
 		query = query.ilike('municipality', filters.municipality);
+	}
+	if (filters.photoFilter === 'with') {
+		query = query.eq('has_photo', true);
+	} else if (filters.photoFilter === 'without') {
+		query = query.eq('has_photo', false);
 	}
 
 	const { data, error } = await query;

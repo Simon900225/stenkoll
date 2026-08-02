@@ -1,4 +1,11 @@
-import type { Block, BlockFilters, BlockMarker, BlockSource, MapBBox } from '$lib/types';
+import type {
+	Block,
+	BlockFilters,
+	BlockMarker,
+	BlockSource,
+	MapBBox,
+	PhotoFilter
+} from '$lib/types';
 
 export const HALLANDSASEN_CENTER: [number, number] = [13.0, 56.3];
 export const DEFAULT_ZOOM = 10;
@@ -6,10 +13,10 @@ export const DEFAULT_ZOOM = 10;
 export const VIEWPORT_BLOCK_LIMIT = 400;
 
 export const MARKER_COLUMNS =
-	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, height_m, area_m2, county, municipality' as const;
+	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, height_m, area_m2, county, municipality, has_photo' as const;
 
 export const BLOCK_DETAIL_COLUMNS =
-	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, created_by, created_at' as const;
+	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, created_by, created_at' as const;
 
 export function toMarker(block: Block): BlockMarker {
 	return {
@@ -25,7 +32,8 @@ export function toMarker(block: Block): BlockMarker {
 		height_m: block.height_m,
 		area_m2: block.area_m2,
 		county: block.county,
-		municipality: block.municipality
+		municipality: block.municipality,
+		has_photo: block.has_photo
 	};
 }
 
@@ -34,7 +42,10 @@ export function filterBlocks(blocks: Block[], filters: BlockFilters): Block[] {
 }
 
 export function matchesFilters(
-	block: Pick<Block, 'climb_score' | 'height_m' | 'area_m2' | 'source' | 'municipality'>,
+	block: Pick<
+		Block,
+		'climb_score' | 'height_m' | 'area_m2' | 'source' | 'municipality' | 'has_photo'
+	>,
 	filters: BlockFilters
 ): boolean {
 	const score = block.climb_score ?? 0;
@@ -48,6 +59,8 @@ export function matchesFilters(
 	) {
 		return false;
 	}
+	if (filters.photoFilter === 'with' && !block.has_photo) return false;
+	if (filters.photoFilter === 'without' && block.has_photo) return false;
 	return true;
 }
 
@@ -168,6 +181,7 @@ export function defaultFilters(): BlockFilters {
 		minHeight: 0,
 		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],
-		municipality: ''
+		municipality: '',
+		photoFilter: 'all' as PhotoFilter
 	};
 }
