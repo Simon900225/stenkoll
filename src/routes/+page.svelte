@@ -28,6 +28,8 @@
 			east: String(b.east),
 			north: String(b.north),
 			minScore: String(f.minScore),
+			minHeight: String(f.minHeight),
+			minArea: String(f.minArea),
 			sources: f.sources.join(',')
 		});
 		if (f.municipality) params.set('municipality', f.municipality);
@@ -61,6 +63,9 @@
 			...marker,
 			description: null,
 			score_rationale: null,
+			length_m: null,
+			width_m: null,
+			size_source: null,
 			created_by: null,
 			created_at: ''
 		};

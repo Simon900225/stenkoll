@@ -12,6 +12,11 @@ export type Block = {
 	lng: number;
 	climb_score: number | null;
 	score_rationale: string | null;
+	height_m: number | null;
+	length_m: number | null;
+	width_m: number | null;
+	area_m2: number | null;
+	size_source: 'parsed' | 'llm' | 'manual' | null;
 	county: string | null;
 	municipality: string | null;
 	created_by: string | null;
@@ -36,6 +41,8 @@ export type Profile = {
 
 export type BlockFilters = {
 	minScore: number;
+	minHeight: number;
+	minArea: number;
 	sources: BlockSource[];
 	municipality: string;
 };
@@ -52,6 +59,8 @@ export type BlockMarker = Pick<
 	| 'lat'
 	| 'lng'
 	| 'climb_score'
+	| 'height_m'
+	| 'area_m2'
 	| 'county'
 	| 'municipality'
 >;
@@ -78,6 +87,11 @@ type Tables = {
 			lng: number;
 			climb_score?: number | null;
 			score_rationale?: string | null;
+			height_m?: number | null;
+			length_m?: number | null;
+			width_m?: number | null;
+			area_m2?: number | null;
+			size_source?: 'parsed' | 'llm' | 'manual' | null;
 			county?: string | null;
 			municipality?: string | null;
 			created_by?: string | null;

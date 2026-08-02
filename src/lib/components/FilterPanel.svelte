@@ -56,6 +56,38 @@
 		</div>
 	</label>
 
+	<label class="field">
+		<span>Minsta höjd (m)</span>
+		<div class="score-row">
+			<input
+				type="range"
+				min="0"
+				max="5"
+				step="0.5"
+				value={filters.minHeight}
+				oninput={(e) =>
+					onchange?.({ ...filters, minHeight: Number(e.currentTarget.value) })}
+			/>
+			<strong>{filters.minHeight === 0 ? 'Alla' : `${filters.minHeight}+`}</strong>
+		</div>
+	</label>
+
+	<label class="field">
+		<span>Minsta yta (m²)</span>
+		<div class="score-row">
+			<input
+				type="range"
+				min="0"
+				max="50"
+				step="5"
+				value={filters.minArea}
+				oninput={(e) =>
+					onchange?.({ ...filters, minArea: Number(e.currentTarget.value) })}
+			/>
+			<strong>{filters.minArea === 0 ? 'Alla' : `${filters.minArea}+`}</strong>
+		</div>
+	</label>
+
 	<fieldset class="field">
 		<legend>Källa</legend>
 		<label class="check">
@@ -83,7 +115,7 @@
 			onchange={(e) => onchange?.({ ...filters, municipality: e.currentTarget.value })}
 		>
 			<option value="">Alla</option>
-			{#each municipalities as m}
+			{#each municipalities as m (m)}
 				<option value={m}>{m}</option>
 			{/each}
 		</select>

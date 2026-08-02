@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const { data: block, error: blockError } = await supabase
 		.from('blocks')
 		.select(
-			'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, county, municipality, created_by, created_at'
+			'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, created_by, created_at'
 		)
 		.eq('id', params.id)
 		.maybeSingle();

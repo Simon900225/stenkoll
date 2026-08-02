@@ -6,10 +6,10 @@ export const DEFAULT_ZOOM = 10;
 export const VIEWPORT_BLOCK_LIMIT = 400;
 
 export const MARKER_COLUMNS =
-	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, county, municipality' as const;
+	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, height_m, area_m2, county, municipality' as const;
 
 export const BLOCK_DETAIL_COLUMNS =
-	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, county, municipality, created_by, created_at' as const;
+	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, created_by, created_at' as const;
 
 export function toMarker(block: Block): BlockMarker {
 	return {
@@ -22,6 +22,8 @@ export function toMarker(block: Block): BlockMarker {
 		lat: block.lat,
 		lng: block.lng,
 		climb_score: block.climb_score,
+		height_m: block.height_m,
+		area_m2: block.area_m2,
 		county: block.county,
 		municipality: block.municipality
 	};
@@ -32,11 +34,13 @@ export function filterBlocks(blocks: Block[], filters: BlockFilters): Block[] {
 }
 
 export function matchesFilters(
-	block: Pick<Block, 'climb_score' | 'source' | 'municipality'>,
+	block: Pick<Block, 'climb_score' | 'height_m' | 'area_m2' | 'source' | 'municipality'>,
 	filters: BlockFilters
 ): boolean {
 	const score = block.climb_score ?? 0;
 	if (score < filters.minScore) return false;
+	if (filters.minHeight > 0 && (block.height_m ?? 0) < filters.minHeight) return false;
+	if (filters.minArea > 0 && (block.area_m2 ?? 0) < filters.minArea) return false;
 	if (!filters.sources.includes(block.source)) return false;
 	if (
 		filters.municipality &&
@@ -161,6 +165,8 @@ export function defaultFilters(): BlockFilters {
 	return {
 		// 0 = include unscored imports (climb_score null treated as 0)
 		minScore: 0,
+		minHeight: 0,
+		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],
 		municipality: ''
 	};

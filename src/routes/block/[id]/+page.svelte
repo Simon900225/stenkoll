@@ -32,6 +32,18 @@
 				{/if}
 			</p>
 			<h1>{block.name}</h1>
+			{#if block.height_m != null || block.area_m2 != null}
+				<p class="size">
+					{#if block.height_m != null}
+						{block.height_m} m hög
+					{/if}
+					{#if block.length_m != null && block.width_m != null}
+						· {block.length_m}×{block.width_m} m
+					{:else if block.area_m2 != null}
+						· {block.area_m2} m²
+					{/if}
+				</p>
+			{/if}
 			{#if block.score_rationale}
 				<p class="rationale">{block.score_rationale}</p>
 			{/if}
@@ -191,6 +203,12 @@
 		font-size: clamp(1.5rem, 3vw, 2rem);
 		letter-spacing: -0.02em;
 		line-height: 1.15;
+	}
+
+	.size {
+		margin: 0.45rem 0 0;
+		font-size: 0.95rem;
+		color: var(--moss-deep);
 	}
 
 	.rationale {

@@ -26,8 +26,12 @@ function parseSources(raw: string | null): Block['source'][] {
 
 export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
 	const minScore = Number(params.get('minScore') ?? '0');
+	const minHeight = Number(params.get('minHeight') ?? '0');
+	const minArea = Number(params.get('minArea') ?? '0');
 	return {
 		minScore: Number.isFinite(minScore) ? Math.min(5, Math.max(0, minScore)) : 0,
+		minHeight: Number.isFinite(minHeight) ? Math.max(0, minHeight) : 0,
+		minArea: Number.isFinite(minArea) ? Math.max(0, minArea) : 0,
 		sources: parseSources(params.get('sources')),
 		municipality: params.get('municipality')?.trim() ?? ''
 	};
@@ -70,6 +74,12 @@ export async function queryViewportBlocks(
 	// Unscored rows use null; treat as 0 so minScore 0 includes them.
 	if (filters.minScore > 0) {
 		query = query.gte('climb_score', filters.minScore);
+	}
+	if (filters.minHeight > 0) {
+		query = query.gte('height_m', filters.minHeight);
+	}
+	if (filters.minArea > 0) {
+		query = query.gte('area_m2', filters.minArea);
 	}
 
 	if (filters.municipality) {
