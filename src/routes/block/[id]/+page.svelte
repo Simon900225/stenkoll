@@ -5,7 +5,8 @@
 		gokartorUrl,
 		googleMapsUrl,
 		lantmaterietFlygUrl,
-		scoreColor
+		scoreColor,
+		theTopoUrl
 	} from '$lib/blocks';
 
 	let { data, form } = $props();
@@ -16,7 +17,8 @@
 	const maps = $derived({
 		google: googleMapsUrl(block.lat, block.lng),
 		flyg: lantmaterietFlygUrl(block.lat, block.lng),
-		gokartor: gokartorUrl(block.lat, block.lng)
+		gokartor: gokartorUrl(block.lat, block.lng),
+		theTopo: theTopoUrl(block.lat, block.lng)
 	});
 </script>
 
@@ -111,6 +113,9 @@
 				>
 				<a class="ext" href={maps.gokartor} target="_blank" rel="noopener noreferrer"
 					>GoKartor ↗</a
+				>
+				<a class="ext" href={maps.theTopo} target="_blank" rel="noopener noreferrer"
+					>The Topo ↗</a
 				>
 			</nav>
 

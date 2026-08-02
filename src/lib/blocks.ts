@@ -110,6 +110,11 @@ export function gokartorUrl(lat: number, lng: number, zoom = 13): string {
 	return `https://kartor.gokartor.se/#${zoom}/${lat.toFixed(4)}/${lng.toFixed(4)}`;
 }
 
+/** The Topo crag explorer — hash is lng,lat,zoom. */
+export function theTopoUrl(lat: number, lng: number, zoom = 13): string {
+	return `https://thetopo.com/crags#${lng},${lat},${zoom}`;
+}
+
 /**
  * Lantmäteriet Min Karta, flygbild. Requires SWEREF99 TM (EPSG:3006) easting/northing.
  * Format: …/plats/3006/v2.0/?e=…&n=…&z=12&mapprofile=flygbild&layers=[["7"]]

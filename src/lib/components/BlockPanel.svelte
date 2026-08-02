@@ -6,7 +6,8 @@
 		gokartorUrl,
 		googleMapsUrl,
 		lantmaterietFlygUrl,
-		scoreColor
+		scoreColor,
+		theTopoUrl
 	} from '$lib/blocks';
 
 	type Props = {
@@ -23,7 +24,8 @@
 			? {
 					google: googleMapsUrl(block.lat, block.lng),
 					flyg: lantmaterietFlygUrl(block.lat, block.lng),
-					gokartor: gokartorUrl(block.lat, block.lng)
+					gokartor: gokartorUrl(block.lat, block.lng),
+					theTopo: theTopoUrl(block.lat, block.lng)
 				}
 			: null
 	);
@@ -90,6 +92,7 @@
 				<a href={maps.google} target="_blank" rel="noopener noreferrer">Google Maps</a>
 				<a href={maps.flyg} target="_blank" rel="noopener noreferrer">Flygkarta</a>
 				<a href={maps.gokartor} target="_blank" rel="noopener noreferrer">GoKartor</a>
+				<a href={maps.theTopo} target="_blank" rel="noopener noreferrer">The Topo</a>
 			</nav>
 		{/if}
 	</aside>
