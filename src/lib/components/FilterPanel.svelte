@@ -33,7 +33,7 @@
 
 <aside class="panel">
 	<header>
-		<p class="brand">Fornsök Boulder Finder</p>
+		<p class="brand">Stenkoll</p>
 		<p class="tagline">Flyttblock med klätterpotential</p>
 	</header>
 

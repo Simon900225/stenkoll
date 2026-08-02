@@ -25,7 +25,7 @@
 		href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap"
 		rel="stylesheet"
 	/>
-	<title>Fornsök Boulder Finder</title>
+	<title>Stenkoll</title>
 </svelte:head>
 
 {@render children()}

@@ -1,4 +1,4 @@
-# Fornsök Boulder Finder
+# Stenkoll
 
 Hitta flyttblock med klätterpotential utifrån RAÄ:s kulturhistoriska lämningar. Kartan samlar poängsatta block från Fornsök och användarbidrag (egna block + bilder).
 

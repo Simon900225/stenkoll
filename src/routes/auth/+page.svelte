@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Logga in · Fornsök Boulder Finder</title>
+	<title>Logga in · Stenkoll</title>
 </svelte:head>
 
 <main class="page">

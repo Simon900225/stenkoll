@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Profil · Fornsök Boulder Finder</title>
+	<title>Profil · Stenkoll</title>
 </svelte:head>
 
 <main class="page">

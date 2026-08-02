@@ -79,7 +79,7 @@
 </script>
 
 <svelte:head>
-	<title>Karta · Fornsök Boulder Finder</title>
+	<title>Karta · Stenkoll</title>
 </svelte:head>
 
 <main class="app">

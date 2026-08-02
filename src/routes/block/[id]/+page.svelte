@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-	<title>{block.name} · Fornsök Boulder Finder</title>
+	<title>{block.name} · Stenkoll</title>
 </svelte:head>
 
 <main class="page">

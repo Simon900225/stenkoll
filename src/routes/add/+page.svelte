@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-	<title>Lägg till block · Fornsök Boulder Finder</title>
+	<title>Lägg till block · Stenkoll</title>
 </svelte:head>
 
 <main class="page">
