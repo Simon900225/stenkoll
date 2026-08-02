@@ -34,9 +34,6 @@
 		<div>
 			<p class="meta">
 				{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}
-				{#if block.municipality}
-					· {block.municipality}{#if block.county}, {block.county}{/if}
-				{/if}
 			</p>
 			<h1>{block.name}</h1>
 			{#if block.user_score != null}

@@ -54,20 +54,9 @@
 				></textarea>
 			</label>
 
-			<div class="row">
-				<label>
-					Din score (1–5)
-					<input type="number" name="climb_score" min="1" max="5" step="1" />
-				</label>
-				<label>
-					Kommun
-					<input type="text" name="municipality" />
-				</label>
-			</div>
-
 			<label>
-				Län
-				<input type="text" name="county" />
+				Din score (1–5)
+				<input type="number" name="climb_score" min="1" max="5" step="1" />
 			</label>
 
 			<label>
@@ -162,12 +151,6 @@
 		text-transform: none;
 		letter-spacing: 0;
 		color: var(--ink);
-	}
-
-	.row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem;
 	}
 
 	.coords {

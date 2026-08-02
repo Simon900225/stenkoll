@@ -17,12 +17,7 @@
 			Magic link via e-post. Krävs för att ladda upp bilder och lägga till egna block.
 		</p>
 
-		{#if data.user}
-			<p class="ok">Inloggad som <strong>{data.user.email}</strong></p>
-			<form method="POST" action="?/signout" use:enhance>
-				<button type="submit" class="btn ghost">Logga ut</button>
-			</form>
-		{:else if data.usingSeedData}
+		{#if data.usingSeedData}
 			<p class="warn">
 				Supabase är inte konfigurerat. Lägg till <code>PUBLIC_SUPABASE_URL</code> och
 				<code>PUBLIC_SUPABASE_ANON_KEY</code> i <code>.env</code>.
@@ -143,12 +138,6 @@
 
 	.btn:hover {
 		background: var(--ink);
-	}
-
-	.btn.ghost {
-		background: transparent;
-		border: 1px solid var(--line);
-		color: var(--ink);
 	}
 
 	.ok {

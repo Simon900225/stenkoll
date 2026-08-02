@@ -3,8 +3,7 @@ import {
 	MARKER_COLUMNS,
 	BLOCK_DETAIL_COLUMNS,
 	padBBox,
-	VIEWPORT_BLOCK_LIMIT,
-	municipalitiesFrom
+	VIEWPORT_BLOCK_LIMIT
 } from '$lib/blocks';
 import { createSupabaseServerClient, isSupabaseConfigured } from '$lib/supabase/client';
 import type { Block, BlockFilters, BlockMarker, MapBBox } from '$lib/types';
@@ -38,7 +37,6 @@ export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
 		minHeight: Number.isFinite(minHeight) ? Math.max(0, minHeight) : 0,
 		minArea: Number.isFinite(minArea) ? Math.max(0, minArea) : 0,
 		sources: parseSources(params.get('sources')),
-		municipality: params.get('municipality')?.trim() ?? '',
 		photoFilter: parsePhotoFilter(params.get('photoFilter'))
 	};
 }
@@ -89,9 +87,6 @@ export async function queryViewportBlocks(
 		query = query.gte('area_m2', filters.minArea);
 	}
 
-	if (filters.municipality) {
-		query = query.ilike('municipality', filters.municipality);
-	}
 	if (filters.photoFilter === 'with') {
 		query = query.eq('has_photo', true);
 	} else if (filters.photoFilter === 'without') {
@@ -129,29 +124,4 @@ export async function queryBlockById(cookies: Cookies, id: string): Promise<Bloc
 	}
 
 	return data as Block;
-}
-
-export async function queryMunicipalities(cookies: Cookies): Promise<{
-	municipalities: string[];
-	usingSeedData: boolean;
-}> {
-	if (!isSupabaseConfigured()) {
-		return { municipalities: [], usingSeedData: true };
-	}
-
-	const supabase = createSupabaseServerClient(cookies);
-	const { data, error } = await supabase
-		.from('blocks')
-		.select('municipality')
-		.not('municipality', 'is', null)
-		.limit(5000);
-
-	if (error || !data?.length) {
-		return { municipalities: [], usingSeedData: false };
-	}
-
-	return {
-		municipalities: municipalitiesFrom(data),
-		usingSeedData: false
-	};
 }

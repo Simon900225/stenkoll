@@ -27,8 +27,6 @@ export const actions: Actions = {
 		const description = String(form.get('description') ?? '').trim();
 		const lat = Number(form.get('lat'));
 		const lng = Number(form.get('lng'));
-		const municipality = String(form.get('municipality') ?? '').trim() || null;
-		const county = String(form.get('county') ?? '').trim() || null;
 		const climbScoreRaw = String(form.get('climb_score') ?? '').trim();
 		const climb_score = climbScoreRaw ? Number(climbScoreRaw) : null;
 		const photo = form.get('photo');
@@ -56,8 +54,8 @@ export const actions: Actions = {
 				score_rationale: climb_score
 					? 'Användarbidrag — egen bedömning.'
 					: null,
-				county,
-				municipality,
+				county: null,
+				municipality: null,
 				created_by: user.id
 			})
 			.select('id')

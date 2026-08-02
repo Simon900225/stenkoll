@@ -44,9 +44,6 @@
 
 		<p class="meta">
 			<span class="source">{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
-			{#if block.municipality}
-				<span>· {block.municipality}{#if block.county}, {block.county}{/if}</span>
-			{/if}
 		</p>
 
 		<h2>{block.name}</h2>

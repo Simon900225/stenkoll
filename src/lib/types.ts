@@ -22,6 +22,8 @@ export type Block = {
 	county: string | null;
 	municipality: string | null;
 	has_photo: boolean;
+	/** Who last set user_score (null when cleared). */
+	user_score_by?: string | null;
 	created_by: string | null;
 	created_at: string;
 	updated_at?: string;
@@ -49,7 +51,6 @@ export type BlockFilters = {
 	minHeight: number;
 	minArea: number;
 	sources: BlockSource[];
-	municipality: string;
 	photoFilter: PhotoFilter;
 };
 
@@ -104,6 +105,7 @@ type Tables = {
 			county?: string | null;
 			municipality?: string | null;
 			has_photo?: boolean;
+			user_score_by?: string | null;
 			created_by?: string | null;
 			created_at?: string;
 			updated_at?: string;

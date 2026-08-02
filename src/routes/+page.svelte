@@ -33,7 +33,6 @@
 			sources: f.sources.join(','),
 			photoFilter: f.photoFilter
 		});
-		if (f.municipality) params.set('municipality', f.municipality);
 
 		fetch(`/api/blocks?${params}`, { signal: ac.signal })
 			.then(async (res) => {
@@ -93,7 +92,7 @@
 
 	<FilterPanel
 		{filters}
-		municipalities={data.municipalities}
+		user={data.user}
 		blockCount={markers.length}
 		{truncated}
 		{loading}

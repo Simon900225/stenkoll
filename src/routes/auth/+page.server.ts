@@ -4,6 +4,7 @@ import { createSupabaseServerClient, isSupabaseConfigured } from '$lib/supabase/
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user, usingSeedData } = await parent();
+	if (user) throw redirect(303, '/profile');
 	return { user, usingSeedData };
 };
 

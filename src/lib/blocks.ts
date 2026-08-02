@@ -52,13 +52,7 @@ export function filterBlocks(blocks: Block[], filters: BlockFilters): Block[] {
 export function matchesFilters(
 	block: Pick<
 		Block,
-		| 'climb_score'
-		| 'user_score'
-		| 'height_m'
-		| 'area_m2'
-		| 'source'
-		| 'municipality'
-		| 'has_photo'
+		'climb_score' | 'user_score' | 'height_m' | 'area_m2' | 'source' | 'has_photo'
 	>,
 	filters: BlockFilters
 ): boolean {
@@ -67,12 +61,6 @@ export function matchesFilters(
 	if (filters.minHeight > 0 && (block.height_m ?? 0) < filters.minHeight) return false;
 	if (filters.minArea > 0 && (block.area_m2 ?? 0) < filters.minArea) return false;
 	if (!filters.sources.includes(block.source)) return false;
-	if (
-		filters.municipality &&
-		(block.municipality ?? '').toLowerCase() !== filters.municipality.toLowerCase()
-	) {
-		return false;
-	}
 	if (filters.photoFilter === 'with' && !block.has_photo) return false;
 	if (filters.photoFilter === 'without' && block.has_photo) return false;
 	return true;
@@ -97,14 +85,6 @@ export function padBBox(bbox: MapBBox, factor = 0.2): MapBBox {
 		east: bbox.east + lngPad,
 		north: bbox.north + latPad
 	};
-}
-
-export function municipalitiesFrom(blocks: { municipality?: string | null }[]): string[] {
-	const set = new Set<string>();
-	for (const b of blocks) {
-		if (b.municipality) set.add(b.municipality);
-	}
-	return [...set].sort((a, b) => a.localeCompare(b, 'sv'));
 }
 
 export function scoreColor(score: number | null): string {
@@ -195,7 +175,6 @@ export function defaultFilters(): BlockFilters {
 		minHeight: 0,
 		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],
-		municipality: '',
 		photoFilter: 'all' as PhotoFilter
 	};
 }

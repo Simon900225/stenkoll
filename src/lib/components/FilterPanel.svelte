@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { BlockFilters, BlockSource, PhotoFilter } from '$lib/types';
+	import type { User } from '@supabase/supabase-js';
 
 	type Props = {
 		filters: BlockFilters;
-		municipalities: string[];
 		blockCount: number;
+		user?: User | null;
 		truncated?: boolean;
 		loading?: boolean;
 		usingSeedData?: boolean;
@@ -13,8 +14,8 @@
 
 	let {
 		filters,
-		municipalities,
 		blockCount,
+		user = null,
 		truncated = false,
 		loading = false,
 		usingSeedData = false,
@@ -109,19 +110,6 @@
 	</fieldset>
 
 	<label class="field">
-		<span>Kommun</span>
-		<select
-			value={filters.municipality}
-			onchange={(e) => onchange?.({ ...filters, municipality: e.currentTarget.value })}
-		>
-			<option value="">Alla</option>
-			{#each municipalities as m (m)}
-				<option value={m}>{m}</option>
-			{/each}
-		</select>
-	</label>
-
-	<label class="field">
 		<span>Bild</span>
 		<select
 			value={filters.photoFilter}
@@ -150,7 +138,11 @@
 
 	<nav class="links">
 		<a href="/add">Lägg till block</a>
-		<a href="/auth">Logga in</a>
+		{#if user}
+			<a href="/profile">Profil</a>
+		{:else}
+			<a href="/auth">Logga in</a>
+		{/if}
 	</nav>
 </aside>
 

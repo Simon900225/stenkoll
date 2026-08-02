@@ -1,7 +1,6 @@
 import type { PageServerLoad } from './$types';
-import { queryMunicipalities } from '$lib/server/blocks';
+import { isSupabaseConfigured } from '$lib/supabase/client';
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	const { municipalities, usingSeedData } = await queryMunicipalities(cookies);
-	return { municipalities, usingSeedData };
+export const load: PageServerLoad = async () => {
+	return { usingSeedData: !isSupabaseConfigured() };
 };
