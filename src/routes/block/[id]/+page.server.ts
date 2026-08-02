@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createSupabaseServerClient, isSupabaseConfigured } from '$lib/supabase/client';
-import { fornsokUrl } from '$lib/blocks';
+import { BLOCK_DETAIL_COLUMNS, fornsokUrl } from '$lib/blocks';
 import { fail } from '@sveltejs/kit';
-import type { Block, Photo } from '$lib/types';
+import type { Block } from '$lib/types';
 
 export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const { user, usingSeedData } = await parent();
@@ -15,9 +15,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const supabase = createSupabaseServerClient(cookies);
 	const { data: block, error: blockError } = await supabase
 		.from('blocks')
-		.select(
-			'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, created_by, created_at'
-		)
+		.select(BLOCK_DETAIL_COLUMNS)
 		.eq('id', params.id)
 		.maybeSingle();
 
@@ -86,5 +84,33 @@ export const actions: Actions = {
 
 		if (insertError) return fail(400, { error: insertError.message });
 		return { success: true };
+	},
+
+	setScore: async ({ request, params, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { scoreError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { scoreError: 'Logga in för att ändra score.' });
+
+		const form = await request.formData();
+		const raw = String(form.get('user_score') ?? '').trim();
+		const p_score = raw === '' ? null : Number(raw);
+
+		if (p_score != null && (!Number.isInteger(p_score) || p_score < 1 || p_score > 5)) {
+			return fail(400, { scoreError: 'Score måste vara 1–5 eller tomt (original).' });
+		}
+
+		const { error: rpcError } = await supabase.rpc('set_block_user_score', {
+			p_block_id: params.id,
+			p_score
+		});
+
+		if (rpcError) return fail(400, { scoreError: rpcError.message });
+		return { scoreSaved: true };
 	}
 };

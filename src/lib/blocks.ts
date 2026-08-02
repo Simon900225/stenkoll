@@ -13,10 +13,17 @@ export const DEFAULT_ZOOM = 10;
 export const VIEWPORT_BLOCK_LIMIT = 400;
 
 export const MARKER_COLUMNS =
-	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, height_m, area_m2, county, municipality, has_photo' as const;
+	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, height_m, area_m2, county, municipality, has_photo' as const;
 
 export const BLOCK_DETAIL_COLUMNS =
-	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, created_by, created_at' as const;
+	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, created_by, created_at' as const;
+
+/** Score shown on the map: user override when set, otherwise import/AI score. */
+export function effectiveScore(
+	block: Pick<Block, 'climb_score' | 'user_score'>
+): number | null {
+	return block.user_score ?? block.climb_score;
+}
 
 export function toMarker(block: Block): BlockMarker {
 	return {
@@ -29,6 +36,7 @@ export function toMarker(block: Block): BlockMarker {
 		lat: block.lat,
 		lng: block.lng,
 		climb_score: block.climb_score,
+		user_score: block.user_score,
 		height_m: block.height_m,
 		area_m2: block.area_m2,
 		county: block.county,
@@ -44,11 +52,17 @@ export function filterBlocks(blocks: Block[], filters: BlockFilters): Block[] {
 export function matchesFilters(
 	block: Pick<
 		Block,
-		'climb_score' | 'height_m' | 'area_m2' | 'source' | 'municipality' | 'has_photo'
+		| 'climb_score'
+		| 'user_score'
+		| 'height_m'
+		| 'area_m2'
+		| 'source'
+		| 'municipality'
+		| 'has_photo'
 	>,
 	filters: BlockFilters
 ): boolean {
-	const score = block.climb_score ?? 0;
+	const score = effectiveScore(block) ?? 0;
 	if (score < filters.minScore) return false;
 	if (filters.minHeight > 0 && (block.height_m ?? 0) < filters.minHeight) return false;
 	if (filters.minArea > 0 && (block.area_m2 ?? 0) < filters.minArea) return false;

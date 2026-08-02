@@ -11,6 +11,8 @@ export type Block = {
 	lat: number;
 	lng: number;
 	climb_score: number | null;
+	/** Community override; when set, shown on the map instead of climb_score. */
+	user_score: number | null;
 	score_rationale: string | null;
 	height_m: number | null;
 	length_m: number | null;
@@ -63,6 +65,7 @@ export type BlockMarker = Pick<
 	| 'lat'
 	| 'lng'
 	| 'climb_score'
+	| 'user_score'
 	| 'height_m'
 	| 'area_m2'
 	| 'county'
@@ -91,6 +94,7 @@ type Tables = {
 			lat: number;
 			lng: number;
 			climb_score?: number | null;
+			user_score?: number | null;
 			score_rationale?: string | null;
 			height_m?: number | null;
 			length_m?: number | null;
@@ -136,7 +140,12 @@ export type Database = {
 	public: {
 		Tables: Tables;
 		Views: Record<string, never>;
-		Functions: Record<string, never>;
+		Functions: {
+			set_block_user_score: {
+				Args: { p_block_id: string; p_score: number | null };
+				Returns: Block;
+			};
+		};
 		Enums: {
 			block_source: BlockSource;
 		};

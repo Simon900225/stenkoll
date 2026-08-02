@@ -74,12 +74,13 @@ export async function queryViewportBlocks(
 		.gte('lat', padded.south)
 		.lte('lat', padded.north)
 		.in('source', filters.sources)
-		.order('climb_score', { ascending: false, nullsFirst: false })
+		.order('display_score', { ascending: false, nullsFirst: false })
 		.limit(VIEWPORT_BLOCK_LIMIT + 1);
 
 	// Unscored rows use null; treat as 0 so minScore 0 includes them.
+	// display_score = coalesce(user_score, climb_score)
 	if (filters.minScore > 0) {
-		query = query.gte('climb_score', filters.minScore);
+		query = query.gte('display_score', filters.minScore);
 	}
 	if (filters.minHeight > 0) {
 		query = query.gte('height_m', filters.minHeight);

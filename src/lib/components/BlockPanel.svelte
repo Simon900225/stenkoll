@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Block } from '$lib/types';
 	import {
+		effectiveScore,
 		fornsokUrl,
 		gokartorUrl,
 		googleMapsUrl,
@@ -16,6 +17,7 @@
 	let { block, onclose }: Props = $props();
 
 	const url = $derived(block ? fornsokUrl(block.fornsok_id) : null);
+	const score = $derived(block ? effectiveScore(block) : null);
 	const maps = $derived(
 		block
 			? {
@@ -28,14 +30,17 @@
 </script>
 
 {#if block}
-	<aside class="detail" style:--score-color={scoreColor(block.climb_score)}>
+	<aside class="detail" style:--score-color={scoreColor(score)}>
 		<button type="button" class="close" onclick={() => onclose?.()} aria-label="Stäng"
 			>×</button
 		>
 
-		<div class="score-badge" aria-label="Score {block.climb_score ?? 'okänd'}">
-			{block.climb_score ?? '—'}
+		<div class="score-badge" aria-label="Score {score ?? 'okänd'}">
+			{score ?? '—'}
 		</div>
+		{#if block.user_score != null}
+			<p class="score-note">Användarscore · original {block.climb_score ?? '—'}</p>
+		{/if}
 
 		<p class="meta">
 			<span class="source">{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
@@ -147,6 +152,12 @@
 		background: var(--score-color);
 		color: #1a1f18;
 		clip-path: polygon(50% 100%, 0 0, 100% 0);
+	}
+
+	.score-note {
+		margin: -0.25rem 0 0.45rem;
+		font-size: 0.72rem;
+		color: var(--muted);
 	}
 
 	.meta {

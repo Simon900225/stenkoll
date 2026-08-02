@@ -11,7 +11,7 @@
 	import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { BlockMarker, MapBBox } from '$lib/types';
-	import { HALLANDSASEN_CENTER, DEFAULT_ZOOM, scoreColor } from '$lib/blocks';
+	import { HALLANDSASEN_CENTER, DEFAULT_ZOOM, effectiveScore, scoreColor } from '$lib/blocks';
 
 	// MapLibre v6 + Vite: use ?worker&url so the shared chunk is bundled into the worker.
 	setWorkerUrl(maplibreWorkerUrl);
@@ -94,10 +94,11 @@
 			el.type = 'button';
 			el.className = 'boulder-marker';
 			el.setAttribute('aria-label', block.name);
-			const score = block.climb_score;
+			const score = effectiveScore(block);
 			el.style.setProperty('--marker-color', scoreColor(score));
 			el.dataset.selected = refs.selectedId === block.id ? 'true' : 'false';
 			el.dataset.source = block.source;
+			if (block.user_score != null) el.dataset.userScore = 'true';
 			// Inner visual so scale transitions never fight MapLibre's position transform.
 			el.innerHTML = `<span class="boulder-marker-visual">${score ?? '?'}</span>`;
 			el.addEventListener('click', (e) => {

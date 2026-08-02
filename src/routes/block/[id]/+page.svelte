@@ -1,11 +1,18 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { gokartorUrl, googleMapsUrl, lantmaterietFlygUrl, scoreColor } from '$lib/blocks';
+	import {
+		effectiveScore,
+		gokartorUrl,
+		googleMapsUrl,
+		lantmaterietFlygUrl,
+		scoreColor
+	} from '$lib/blocks';
 
 	let { data, form } = $props();
 
 	const block = $derived(data.block);
-	const color = $derived(scoreColor(block.climb_score));
+	const score = $derived(effectiveScore(block));
+	const color = $derived(scoreColor(score));
 	const maps = $derived({
 		google: googleMapsUrl(block.lat, block.lng),
 		flyg: lantmaterietFlygUrl(block.lat, block.lng),
@@ -21,8 +28,8 @@
 	<a class="back" href="/">← Kartan</a>
 
 	<article class="hero" style:--score-color={color}>
-		<div class="score" aria-label="Score {block.climb_score ?? 'okänd'}">
-			{block.climb_score ?? '—'}
+		<div class="score" aria-label="Score {score ?? 'okänd'}">
+			{score ?? '—'}
 		</div>
 		<div>
 			<p class="meta">
@@ -32,6 +39,9 @@
 				{/if}
 			</p>
 			<h1>{block.name}</h1>
+			{#if block.user_score != null}
+				<p class="score-note">Användarscore · original {block.climb_score ?? '—'}</p>
+			{/if}
 			{#if block.height_m != null || block.area_m2 != null}
 				<p class="size">
 					{#if block.height_m != null}
@@ -65,6 +75,32 @@
 						<br /><span class="dim">{block.lamningstyp}</span>
 					{/if}
 				</p>
+			{/if}
+
+			<h2>Score</h2>
+			{#if data.user && !data.usingSeedData}
+				<form method="POST" action="?/setScore" use:enhance class="score-form">
+					<label>
+						Användarscore (visas på kartan)
+						<select name="user_score" value={block.user_score == null ? '' : String(block.user_score)}>
+							<option value="">Original ({block.climb_score ?? '—'})</option>
+							{#each [1, 2, 3, 4, 5] as s (s)}
+								<option value={s}>{s}</option>
+							{/each}
+						</select>
+					</label>
+					<button type="submit" class="btn">Spara score</button>
+				</form>
+				{#if form?.scoreError}
+					<p class="err">{form.scoreError}</p>
+				{/if}
+				{#if form?.scoreSaved}
+					<p class="ok">Score sparad.</p>
+				{/if}
+			{:else if !data.user}
+				<p class="dim"><a href="/auth">Logga in</a> för att ändra score.</p>
+			{:else}
+				<p class="dim">Score: {score ?? '—'}</p>
 			{/if}
 
 			<p class="coords">{block.lat.toFixed(5)}, {block.lng.toFixed(5)}</p>
@@ -214,6 +250,41 @@
 	.rationale {
 		margin: 0.6rem 0 0;
 		line-height: 1.45;
+	}
+
+	.score-note {
+		margin: 0.35rem 0 0;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+
+	.score-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+		margin: 0;
+	}
+
+	.score-form label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--muted);
+	}
+
+	.score-form select {
+		font: inherit;
+		font-size: 0.9rem;
+		text-transform: none;
+		letter-spacing: 0;
+		padding: 0.45rem 0.55rem;
+		border: 1px solid var(--line);
+		background: var(--chalk);
+		color: var(--ink);
+		border-radius: 2px;
 	}
 
 	.grid {
