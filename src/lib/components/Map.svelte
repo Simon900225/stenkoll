@@ -104,6 +104,7 @@
 			el.dataset.source = block.source;
 			if (block.user_score != null) el.dataset.userScore = 'true';
 			if (block.developed) el.dataset.developed = 'true';
+			if (block.has_photo) el.dataset.hasPhoto = 'true';
 			// Inner visual so scale transitions never fight MapLibre's position transform.
 			el.innerHTML = `<span class="boulder-marker-visual">${score ?? '?'}</span>`;
 			el.addEventListener('click', (e) => {
@@ -311,7 +312,17 @@
 		border: 1px solid var(--ink);
 	}
 
-	/* Green border ring for developed boulders (triangle pin via layered clip-paths). */
+	/* Border rings: blue = has photo (not developed), green = developed. */
+	.map-wrap :global(.boulder-marker[data-has-photo='true']:not([data-developed='true'])::before) {
+		content: '';
+		position: absolute;
+		inset: 0 0 4px;
+		background: #2563eb;
+		clip-path: polygon(50% 100%, 0 0, 100% 0);
+		border-radius: 2px 2px 0 0;
+		pointer-events: none;
+	}
+
 	.map-wrap :global(.boulder-marker[data-developed='true']::before) {
 		content: '';
 		position: absolute;
@@ -322,10 +333,13 @@
 		pointer-events: none;
 	}
 
+	.map-wrap :global(.boulder-marker[data-has-photo='true'] .boulder-marker-visual),
 	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual) {
+		position: relative;
 		z-index: 1;
 	}
 
+	.map-wrap :global(.boulder-marker[data-has-photo='true'] .boulder-marker-visual::before),
 	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual::before) {
 		inset: 2px 4px 8px;
 	}
