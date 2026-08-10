@@ -112,5 +112,31 @@ export const actions: Actions = {
 
 		if (rpcError) return fail(400, { scoreError: rpcError.message });
 		return { scoreSaved: true };
+	},
+
+	setDeveloped: async ({ request, params, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { developedError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { developedError: 'Logga in för att markera utvecklade block.' });
+
+		const form = await request.formData();
+		const raw = String(form.get('developed') ?? '').trim().toLowerCase();
+		if (raw !== 'true' && raw !== 'false') {
+			return fail(400, { developedError: 'Ogiltigt värde.' });
+		}
+
+		const { error: rpcError } = await supabase.rpc('set_block_developed', {
+			p_block_id: params.id,
+			p_developed: raw === 'true'
+		});
+
+		if (rpcError) return fail(400, { developedError: rpcError.message });
+		return { developedSaved: true };
 	}
 };

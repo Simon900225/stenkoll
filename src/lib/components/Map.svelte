@@ -12,6 +12,7 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { BlockMarker, MapBBox } from '$lib/types';
 	import { HALLANDSASEN_CENTER, DEFAULT_ZOOM, effectiveScore, scoreColor } from '$lib/blocks';
+	import { loadMapView, saveMapView } from '$lib/mapView';
 
 	// MapLibre v6 + Vite: use ?worker&url so the shared chunk is bundled into the worker.
 	setWorkerUrl(maplibreWorkerUrl);
@@ -20,6 +21,8 @@
 		blocks: BlockMarker[];
 		selectedId?: string | null;
 		pickMode?: boolean;
+		/** Persist/restore center+zoom across navigations (home map). */
+		rememberViewport?: boolean;
 		onselect?: (block: BlockMarker) => void;
 		onpick?: (lngLat: { lng: number; lat: number }) => void;
 		onbounds?: (bbox: MapBBox) => void;
@@ -30,6 +33,7 @@
 		blocks,
 		selectedId = null,
 		pickMode = false,
+		rememberViewport = false,
 		onselect,
 		onpick,
 		onbounds,
@@ -99,6 +103,7 @@
 			el.dataset.selected = refs.selectedId === block.id ? 'true' : 'false';
 			el.dataset.source = block.source;
 			if (block.user_score != null) el.dataset.userScore = 'true';
+			if (block.developed) el.dataset.developed = 'true';
 			// Inner visual so scale transitions never fight MapLibre's position transform.
 			el.innerHTML = `<span class="boulder-marker-visual">${score ?? '?'}</span>`;
 			el.addEventListener('click', (e) => {
@@ -129,34 +134,54 @@
 		}
 	});
 
+	function persistViewport() {
+		if (!rememberViewport || !map) return;
+		const c = map.getCenter();
+		saveMapView({ lng: c.lng, lat: c.lat, zoom: map.getZoom() });
+	}
+
 	onMount(() => {
 		if (!container) return;
+
+		const saved = rememberViewport ? loadMapView() : null;
 
 		map = new MapLibreMap({
 			container,
 			style: OPENFREEMAP_STYLE,
-			center: HALLANDSASEN_CENTER,
-			zoom: DEFAULT_ZOOM,
+			center: saved ? [saved.lng, saved.lat] : HALLANDSASEN_CENTER,
+			zoom: saved?.zoom ?? DEFAULT_ZOOM,
 			// OpenFreeMap vector tiles only go to z14; higher zooms return empty tiles.
 			maxZoom: 14,
 			attributionControl: { compact: true }
 		});
 
 		map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-		map.addControl(
-			new GeolocateControl({
-				positionOptions: { enableHighAccuracy: true },
-				trackUserLocation: false
-			}),
-			'top-right'
-		);
+		const geolocate = new GeolocateControl({
+			positionOptions: { enableHighAccuracy: true },
+			trackUserLocation: false
+		});
+		map.addControl(geolocate, 'top-right');
 
 		map.on('load', () => {
 			renderMarkers();
 			emitBounds();
+			// First visit only: try to center on the user (permission may be denied).
+			if (rememberViewport && !saved) {
+				try {
+					geolocate.trigger();
+				} catch {
+					// GeolocateControl throws if the map style is not ready; ignore.
+				}
+			}
 		});
-		map.on('moveend', scheduleBounds);
-		map.on('zoomend', scheduleBounds);
+		map.on('moveend', () => {
+			scheduleBounds();
+			persistViewport();
+		});
+		map.on('zoomend', () => {
+			scheduleBounds();
+			persistViewport();
+		});
 
 		map.on('click', (e: MapMouseEvent) => {
 			if (refs.pickMode) {
@@ -228,6 +253,7 @@
 	}
 
 	.map-wrap :global(.boulder-marker) {
+		position: relative;
 		width: 28px;
 		height: 34px;
 		border: none;
@@ -284,6 +310,26 @@
 		border-radius: 50%;
 		background: var(--chalk);
 		border: 1px solid var(--ink);
+	}
+
+	/* Green border ring for developed boulders (triangle pin via layered clip-paths). */
+	.map-wrap :global(.boulder-marker[data-developed='true']::before) {
+		content: '';
+		position: absolute;
+		inset: 0 0 4px;
+		background: #2f9e44;
+		clip-path: polygon(50% 100%, 0 0, 100% 0);
+		border-radius: 2px 2px 0 0;
+		pointer-events: none;
+	}
+
+	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual) {
+		position: relative;
+		z-index: 1;
+	}
+
+	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual::before) {
+		inset: 2px 4px 8px;
 	}
 
 	.map-wrap :global(.boulder-marker:hover .boulder-marker-visual) {

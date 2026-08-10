@@ -46,6 +46,9 @@
 
 		<p class="meta">
 			<span class="source">{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
+			{#if block.developed}
+				<span class="badge">Utvecklad</span>
+			{/if}
 		</p>
 
 		<h2>{block.name}</h2>
@@ -161,6 +164,10 @@
 	}
 
 	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
 		margin: 0;
 		font-size: 0.75rem;
 		color: var(--muted);
@@ -171,6 +178,20 @@
 	.source {
 		color: var(--moss-deep);
 		font-weight: 600;
+	}
+
+	.badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.15rem 0.45rem;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #14532d;
+		background: color-mix(in srgb, #2f9e44 22%, var(--chalk));
+		border: 1px solid #2f9e44;
+		border-radius: 2px;
 	}
 
 	h2 {

@@ -22,6 +22,8 @@ export type Block = {
 	county: string | null;
 	municipality: string | null;
 	has_photo: boolean;
+	/** Community flag: boulder is developed / established. */
+	developed: boolean;
 	/** Who last set user_score (null when cleared). */
 	user_score_by?: string | null;
 	created_by: string | null;
@@ -72,6 +74,7 @@ export type BlockMarker = Pick<
 	| 'county'
 	| 'municipality'
 	| 'has_photo'
+	| 'developed'
 >;
 
 export type MapBBox = {
@@ -105,6 +108,7 @@ type Tables = {
 			county?: string | null;
 			municipality?: string | null;
 			has_photo?: boolean;
+			developed?: boolean;
 			user_score_by?: string | null;
 			created_by?: string | null;
 			created_at?: string;
@@ -145,6 +149,10 @@ export type Database = {
 		Functions: {
 			set_block_user_score: {
 				Args: { p_block_id: string; p_score: number | null };
+				Returns: Block;
+			};
+			set_block_developed: {
+				Args: { p_block_id: string; p_developed: boolean };
 				Returns: Block;
 			};
 		};

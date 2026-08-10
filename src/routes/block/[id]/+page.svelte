@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import {
 		effectiveScore,
 		gokartorUrl,
@@ -20,6 +21,32 @@
 		gokartor: gokartorUrl(block.lat, block.lng),
 		theTopo: theTopoUrl(block.lat, block.lng)
 	});
+
+	type LightboxPhoto = { url: string; alt: string; caption: string | null };
+	let lightboxPhoto = $state<LightboxPhoto | null>(null);
+	let lightboxDialog: HTMLDialogElement | undefined = $state();
+
+	async function openLightbox(photo: { url: string; caption: string | null }) {
+		lightboxPhoto = {
+			url: photo.url,
+			alt: photo.caption ?? block.name,
+			caption: photo.caption
+		};
+		await tick();
+		lightboxDialog?.showModal();
+	}
+
+	function closeLightbox() {
+		lightboxDialog?.close();
+	}
+
+	function onLightboxClose() {
+		lightboxPhoto = null;
+	}
+
+	function onLightboxClick(event: MouseEvent) {
+		if (event.target === lightboxDialog) closeLightbox();
+	}
 </script>
 
 <svelte:head>
@@ -35,7 +62,10 @@
 		</div>
 		<div>
 			<p class="meta">
-				{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}
+				<span>{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
+				{#if block.developed}
+					<span class="badge">Utvecklad</span>
+				{/if}
 			</p>
 			<h1>{block.name}</h1>
 			{#if block.user_score != null}
@@ -102,6 +132,26 @@
 				<p class="dim">Score: {score ?? '—'}</p>
 			{/if}
 
+			<h2>Utveckling</h2>
+			{#if data.user && !data.usingSeedData}
+				<form method="POST" action="?/setDeveloped" use:enhance class="developed-form">
+					<input type="hidden" name="developed" value={block.developed ? 'false' : 'true'} />
+					<button type="submit" class="btn" class:secondary={block.developed}>
+						{block.developed ? 'Ta bort utvecklingsmarkering' : 'Markera som utvecklad'}
+					</button>
+				</form>
+				{#if form?.developedError}
+					<p class="err">{form.developedError}</p>
+				{/if}
+				{#if form?.developedSaved}
+					<p class="ok">Sparat.</p>
+				{/if}
+			{:else if !data.user}
+				<p class="dim"><a href="/auth">Logga in</a> för att markera som utvecklad.</p>
+			{:else}
+				<p class="dim">{block.developed ? 'Utvecklad' : 'Inte markerad som utvecklad'}</p>
+			{/if}
+
 			<p class="coords">{block.lat.toFixed(5)}, {block.lng.toFixed(5)}</p>
 
 			<nav class="map-links" aria-label="Öppna i karta">
@@ -138,9 +188,16 @@
 
 			{#if data.photos.length}
 				<ul class="gallery">
-					{#each data.photos as photo}
+					{#each data.photos as photo (photo.id)}
 						<li>
-							<img src={photo.url} alt={photo.caption ?? block.name} loading="lazy" />
+							<button
+								type="button"
+								class="gallery-thumb"
+								onclick={() => openLightbox(photo)}
+								aria-label="Visa bild i fullskärm{photo.caption ? `: ${photo.caption}` : ''}"
+							>
+								<img src={photo.url} alt={photo.caption ?? block.name} loading="lazy" />
+							</button>
 							{#if photo.caption}
 								<p>{photo.caption}</p>
 							{/if}
@@ -176,6 +233,25 @@
 		</div>
 	</section>
 </main>
+
+<dialog
+	class="lightbox"
+	bind:this={lightboxDialog}
+	onclose={onLightboxClose}
+	onclick={onLightboxClick}
+>
+	{#if lightboxPhoto}
+		<figure class="lightbox-figure">
+			<img src={lightboxPhoto.url} alt={lightboxPhoto.alt} />
+			{#if lightboxPhoto.caption}
+				<figcaption class="lightbox-caption">{lightboxPhoto.caption}</figcaption>
+			{/if}
+		</figure>
+	{/if}
+	<form method="dialog" class="lightbox-close-form">
+		<button type="submit" class="lightbox-close" aria-label="Stäng">Stäng</button>
+	</form>
+</dialog>
 
 <style>
 	.page {
@@ -228,11 +304,32 @@
 	}
 
 	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
 		margin: 0;
 		font-size: 0.75rem;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		color: var(--muted);
+	}
+
+	.badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.15rem 0.45rem;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: #14532d;
+		background: color-mix(in srgb, #2f9e44 22%, var(--chalk));
+		border: 1px solid #2f9e44;
+		border-radius: 2px;
+	}
+
+	.developed-form {
+		margin: 0;
 	}
 
 	h1 {
@@ -297,9 +394,13 @@
 	}
 
 	h2 {
-		margin: 0 0 0.5rem;
+		margin: 1.25rem 0 0.5rem;
 		font-family: var(--font-display);
 		font-size: 1.1rem;
+	}
+
+	.col > h2:first-child {
+		margin-top: 0;
 	}
 
 	.body {
@@ -348,19 +449,100 @@
 		gap: 0.75rem;
 	}
 
-	.gallery img {
+	.gallery-thumb {
+		display: block;
 		width: 100%;
+		padding: 0;
+		border: none;
+		background: color-mix(in srgb, var(--ink) 8%, transparent);
+		border-radius: 2px;
+		cursor: zoom-in;
+	}
+
+	.gallery-thumb:focus-visible {
+		outline: 2px solid var(--moss-deep);
+		outline-offset: 2px;
+	}
+
+	.gallery-thumb img {
+		width: 100%;
+		height: auto;
 		display: block;
 		border-radius: 2px;
-		aspect-ratio: 4 / 3;
-		object-fit: cover;
-		background: color-mix(in srgb, var(--ink) 8%, transparent);
+		object-fit: contain;
 	}
 
 	.gallery p {
 		margin: 0.3rem 0 0;
 		font-size: 0.85rem;
 		color: var(--muted);
+	}
+
+	.lightbox {
+		width: 100vw;
+		height: 100vh;
+		max-width: 100vw;
+		max-height: 100vh;
+		margin: 0;
+		padding: 1.25rem;
+		border: none;
+		background: transparent;
+		color: var(--chalk);
+	}
+
+	.lightbox[open] {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.lightbox::backdrop {
+		background: rgb(10 12 9 / 0.88);
+	}
+
+	.lightbox-figure {
+		margin: 0;
+		max-width: min(96vw, 1200px);
+	}
+
+	.lightbox-figure img {
+		display: block;
+		max-width: min(96vw, 1200px);
+		max-height: calc(100vh - 4.5rem);
+		width: auto;
+		height: auto;
+		margin: 0 auto;
+		object-fit: contain;
+	}
+
+	.lightbox-caption {
+		margin: 0.65rem 0 0;
+		text-align: center;
+		font-size: 0.9rem;
+		color: color-mix(in srgb, var(--chalk) 85%, transparent);
+	}
+
+	.lightbox-close-form {
+		position: absolute;
+		top: 0.85rem;
+		right: 0.85rem;
+		margin: 0;
+	}
+
+	.lightbox-close {
+		padding: 0.45rem 0.8rem;
+		border: 1px solid color-mix(in srgb, var(--chalk) 35%, transparent);
+		background: rgb(10 12 9 / 0.7);
+		color: var(--chalk);
+		font: inherit;
+		font-weight: 600;
+		font-size: 0.85rem;
+		cursor: pointer;
+		border-radius: 2px;
+	}
+
+	.lightbox-close:hover {
+		background: rgb(10 12 9 / 0.9);
 	}
 
 	.upload {
@@ -400,7 +582,7 @@
 	.btn {
 		align-self: flex-start;
 		padding: 0.5rem 0.9rem;
-		border: none;
+		border: 1px solid transparent;
 		background: var(--moss-deep);
 		color: var(--chalk);
 		font-weight: 600;
@@ -410,6 +592,17 @@
 
 	.btn:hover {
 		background: var(--ink);
+	}
+
+	.btn.secondary {
+		background: transparent;
+		color: var(--moss-deep);
+		border-color: var(--moss-deep);
+	}
+
+	.btn.secondary:hover {
+		background: color-mix(in srgb, var(--moss) 18%, var(--chalk));
+		color: var(--ink);
 	}
 
 	.err {

@@ -66,6 +66,7 @@
 			length_m: null,
 			width_m: null,
 			size_source: null,
+			developed: marker.developed,
 			created_by: null,
 			created_at: ''
 		};
@@ -86,6 +87,7 @@
 	<Map
 		blocks={markers}
 		selectedId={selected?.id ?? null}
+		rememberViewport
 		onselect={selectMarker}
 		onbounds={(b) => (bounds = b)}
 	/>

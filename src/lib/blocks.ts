@@ -13,10 +13,10 @@ export const DEFAULT_ZOOM = 10;
 export const VIEWPORT_BLOCK_LIMIT = 400;
 
 export const MARKER_COLUMNS =
-	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, height_m, area_m2, county, municipality, has_photo' as const;
+	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, height_m, area_m2, county, municipality, has_photo, developed' as const;
 
 export const BLOCK_DETAIL_COLUMNS =
-	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, created_by, created_at' as const;
+	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, developed, created_by, created_at' as const;
 
 /** Score shown on the map: user override when set, otherwise import/AI score. */
 export function effectiveScore(
@@ -41,7 +41,8 @@ export function toMarker(block: Block): BlockMarker {
 		area_m2: block.area_m2,
 		county: block.county,
 		municipality: block.municipality,
-		has_photo: block.has_photo
+		has_photo: block.has_photo,
+		developed: block.developed
 	};
 }
 
