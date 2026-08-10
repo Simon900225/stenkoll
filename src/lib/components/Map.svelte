@@ -253,7 +253,6 @@
 	}
 
 	.map-wrap :global(.boulder-marker) {
-		position: relative;
 		width: 28px;
 		height: 34px;
 		border: none;
@@ -324,7 +323,6 @@
 	}
 
 	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual) {
-		position: relative;
 		z-index: 1;
 	}
 
