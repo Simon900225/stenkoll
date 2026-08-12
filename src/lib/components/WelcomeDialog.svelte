@@ -22,10 +22,8 @@
 	function attachDialog(node: HTMLDialogElement) {
 		dialogEl = node;
 		if (shouldAutoOpen()) node.showModal();
-		return {
-			destroy() {
-				dialogEl = undefined;
-			}
+		return () => {
+			dialogEl = undefined;
 		};
 	}
 
@@ -48,7 +46,7 @@
 </script>
 
 <dialog
-	use:attachDialog
+	{@attach attachDialog}
 	class="welcome"
 	aria-labelledby="welcome-title"
 	aria-describedby="welcome-desc"
@@ -58,7 +56,7 @@
 	<button type="button" class="close" onclick={dismiss} aria-label="Stäng">×</button>
 
 	<p class="kicker">Stenkoll</p>
-	<h2 id="welcome-title">Hitta flyttblock att klättra på</h2>
+	<h2 id="welcome-title">Hitta flyttblock med klätterpotential</h2>
 	<p id="welcome-desc" class="lead">
 		Kartan samlar poängsatta block från Fornsök och andra klättrare. Så här kommer du igång:
 	</p>
