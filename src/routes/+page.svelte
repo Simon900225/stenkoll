@@ -4,6 +4,7 @@
 	import FilterPanel from '$lib/components/FilterPanel.svelte';
 	import BlockPanel from '$lib/components/BlockPanel.svelte';
 	import BottomSheet from '$lib/components/BottomSheet.svelte';
+	import WelcomeDialog from '$lib/components/WelcomeDialog.svelte';
 	import { defaultFilters, matchesFilters } from '$lib/blocks';
 	import type { Block, BlockFilters, BlockMarker, MapBBox } from '$lib/types';
 
@@ -19,6 +20,7 @@
 	let favoriteBusy = $state(false);
 
 	let isMobile = $state(false);
+	let welcome = $state<{ show: () => void } | null>(null);
 	let sheet = $state<{
 		snapTo: (name: string, opts?: { animate?: boolean }) => void;
 		getCurrentBreak: () => string;
@@ -195,7 +197,18 @@
 	/>
 
 	<div class="brand-mark">
-		<h1>Stenkoll</h1>
+		<div class="brand-row">
+			<h1>Stenkoll</h1>
+			<button
+				type="button"
+				class="help"
+				onclick={() => welcome?.show()}
+				aria-label="Så här fungerar Stenkoll"
+				title="Så här fungerar Stenkoll"
+			>
+				?
+			</button>
+		</div>
 		{#if !isMobile}
 			<p>
 				{#if loading}
@@ -209,6 +222,8 @@
 			</p>
 		{/if}
 	</div>
+
+	<WelcomeDialog bind:this={welcome} />
 
 	{#if isMobile}
 		<BottomSheet
@@ -311,6 +326,12 @@
 		pointer-events: none;
 	}
 
+	.brand-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
 	.brand-mark h1 {
 		margin: 0;
 		font-family: var(--font-display);
@@ -319,6 +340,32 @@
 		letter-spacing: -0.02em;
 		line-height: 1.1;
 		color: var(--ink);
+	}
+
+	.help {
+		pointer-events: auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.35rem;
+		height: 1.35rem;
+		padding: 0;
+		border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+		background: color-mix(in srgb, var(--panel) 55%, transparent);
+		border-radius: 999px;
+		font-family: var(--font-display);
+		font-size: 0.78rem;
+		font-weight: 700;
+		line-height: 1;
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.help:hover,
+	.help:focus-visible {
+		border-color: var(--moss-deep);
+		background: var(--panel);
+		outline: none;
 	}
 
 	.brand-mark p {
