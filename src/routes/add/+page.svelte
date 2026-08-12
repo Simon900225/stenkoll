@@ -7,6 +7,8 @@
 	let lat = $state<number | null>(null);
 	let lng = $state<number | null>(null);
 	let pickMode = $state(true);
+
+	const picked = $derived(lat != null && lng != null ? { lng, lat } : null);
 </script>
 
 <svelte:head>
@@ -18,11 +20,12 @@
 		<Map
 			blocks={[]}
 			{pickMode}
+			{picked}
 			onpick={(p) => {
 				lng = p.lng;
 				lat = p.lat;
 			}}
-			flyTo={lat != null && lng != null ? { lng, lat, zoom: 14 } : null}
+			flyTo={picked ? { ...picked, zoom: 14 } : null}
 		/>
 	</div>
 

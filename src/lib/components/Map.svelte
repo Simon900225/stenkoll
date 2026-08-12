@@ -21,6 +21,8 @@
 		blocks: BlockMarker[];
 		selectedId?: string | null;
 		pickMode?: boolean;
+		/** Pin shown while placing a new block. */
+		picked?: { lng: number; lat: number } | null;
 		/** Persist/restore center+zoom across navigations (home map). */
 		rememberViewport?: boolean;
 		onselect?: (block: BlockMarker) => void;
@@ -33,6 +35,7 @@
 		blocks,
 		selectedId = null,
 		pickMode = false,
+		picked = null,
 		rememberViewport = false,
 		onselect,
 		onpick,
@@ -43,6 +46,7 @@
 	let container: HTMLDivElement | undefined = $state();
 	let map: MapLibreMap | undefined;
 	let markers: Marker[] = [];
+	let pickMarker: Marker | undefined;
 	let boundsTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const refs: {
@@ -52,10 +56,12 @@
 		onbounds?: Props['onbounds'];
 		blocks: BlockMarker[];
 		selectedId: string | null;
+		picked: { lng: number; lat: number } | null;
 	} = {
 		pickMode: false,
 		blocks: [],
-		selectedId: null
+		selectedId: null,
+		picked: null
 	};
 
 	function emitBounds() {
@@ -83,11 +89,36 @@
 		refs.onbounds = onbounds;
 		refs.blocks = blocks;
 		refs.selectedId = selectedId;
+		refs.picked = picked;
 	});
 
 	function clearMarkers() {
 		for (const m of markers) m.remove();
 		markers = [];
+	}
+
+	function clearPickMarker() {
+		pickMarker?.remove();
+		pickMarker = undefined;
+	}
+
+	function renderPickMarker(loc: { lng: number; lat: number } | null) {
+		if (!map) return;
+		if (!loc) {
+			clearPickMarker();
+			return;
+		}
+		if (!pickMarker) {
+			const el = document.createElement('div');
+			el.className = 'boulder-marker pick-marker';
+			el.setAttribute('aria-label', 'Vald plats');
+			el.innerHTML = `<span class="boulder-marker-visual">+</span>`;
+			pickMarker = new Marker({ element: el, anchor: 'bottom' })
+				.setLngLat([loc.lng, loc.lat])
+				.addTo(map);
+		} else {
+			pickMarker.setLngLat([loc.lng, loc.lat]);
+		}
 	}
 
 	function renderMarkers() {
@@ -123,6 +154,11 @@
 		blocks;
 		selectedId;
 		if (map) renderMarkers();
+	});
+
+	$effect(() => {
+		picked;
+		if (map) renderPickMarker(picked);
 	});
 
 	$effect(() => {
@@ -165,6 +201,7 @@
 
 		map.on('load', () => {
 			renderMarkers();
+			renderPickMarker(refs.picked);
 			emitBounds();
 			// First visit only: try to center on the user (permission may be denied).
 			if (rememberViewport && !saved) {
@@ -186,7 +223,9 @@
 
 		map.on('click', (e: MapMouseEvent) => {
 			if (refs.pickMode) {
-				refs.onpick?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+				const loc = { lng: e.lngLat.lng, lat: e.lngLat.lat };
+				renderPickMarker(loc);
+				refs.onpick?.(loc);
 			}
 		});
 
@@ -197,6 +236,7 @@
 			clearTimeout(boundsTimer);
 			ro.disconnect();
 			clearMarkers();
+			clearPickMarker();
 			map?.remove();
 			map = undefined;
 		};
@@ -346,5 +386,20 @@
 
 	.map-wrap :global(.boulder-marker:hover .boulder-marker-visual) {
 		transform: scale(1.12);
+	}
+
+	.map-wrap :global(.pick-marker) {
+		pointer-events: none;
+		z-index: 3;
+		filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.45));
+	}
+
+	.map-wrap :global(.pick-marker .boulder-marker-visual) {
+		transform: scale(1.2);
+		color: var(--chalk);
+	}
+
+	.map-wrap :global(.pick-marker .boulder-marker-visual::before) {
+		background: var(--amber, #c4783a);
 	}
 </style>
