@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import Map from '$lib/components/Map.svelte';
 	import FilterPanel from '$lib/components/FilterPanel.svelte';
 	import BlockPanel from '$lib/components/BlockPanel.svelte';
@@ -20,43 +20,54 @@
 
 	let isMobile = $state(false);
 	let sheet = $state<{
-		present: (opts?: { animate?: boolean }) => void;
-		destroy: (opts?: { animate?: boolean }) => void;
 		snapTo: (name: string, opts?: { animate?: boolean }) => void;
+		getCurrentBreak: () => string;
 	} | null>(null);
+	let viewportH = $state(800);
+	let safeBottom = $state(0);
 
 	const MOBILE_MQ = '(max-width: 640px)';
 
-	function sheetBreaks() {
-		const h = typeof window !== 'undefined' ? window.innerHeight : 800;
-		return {
-			top: { enabled: true, height: Math.round(h * 0.88) },
-			middle: { enabled: true, height: Math.round(h * 0.48) },
-			bottom: { enabled: true, height: 64 }
-		};
-	}
+	const sheetBreaks = $derived({
+		top: { enabled: true, height: Math.round(viewportH * 0.88) },
+		middle: { enabled: true, height: Math.round(viewportH * 0.88) },
+		bottom: { enabled: true, height: Math.round(72 + safeBottom) }
+	});
 
 	onMount(() => {
+		viewportH = window.innerHeight;
+		const probe = document.createElement('div');
+		probe.style.paddingBottom = 'env(safe-area-inset-bottom)';
+		document.body.appendChild(probe);
+		safeBottom = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+		probe.remove();
 		const mq = window.matchMedia(MOBILE_MQ);
 		const sync = () => {
 			isMobile = mq.matches;
+			viewportH = window.innerHeight;
 		};
 		sync();
 		mq.addEventListener('change', sync);
-		return () => mq.removeEventListener('change', sync);
-	});
-
-	$effect(() => {
-		if (!isMobile || !sheet) return;
-		sheet.present({ animate: false });
+		window.addEventListener('resize', sync);
+		return () => {
+			mq.removeEventListener('change', sync);
+			window.removeEventListener('resize', sync);
+		};
 	});
 
 	let lastSheetBlockId: string | null = null;
+	let savedFilterBreak = 'middle';
 	$effect(() => {
 		if (!isMobile || !sheet) return;
+		const pane = sheet;
 		const id = selected?.id ?? null;
 		if (id && id !== lastSheetBlockId) {
-			sheet.snapTo('middle');
+			if (!lastSheetBlockId) {
+				savedFilterBreak = untrack(() => pane.getCurrentBreak());
+			}
+			pane.snapTo('middle');
+		} else if (!id && lastSheetBlockId) {
+			pane.snapTo(savedFilterBreak);
 		}
 		lastSheetBlockId = id;
 	});
@@ -183,20 +194,55 @@
 		onbounds={(b) => (bounds = b)}
 	/>
 
+	<div class="brand-mark">
+		<h1>Stenkoll</h1>
+		{#if !isMobile}
+			<p>
+				{#if loading}
+					Laddar…
+				{:else}
+					{markers.length} st block i vyn
+					{#if truncated}
+						<span>(max — zooma in)</span>
+					{/if}
+				{/if}
+			</p>
+		{/if}
+	</div>
+
 	{#if isMobile}
 		<BottomSheet
 			bind:this={sheet}
 			backdrop={Boolean(selected)}
 			backdropOpacity={0.25}
 			initialBreak="middle"
-			breaks={sheetBreaks()}
+			breaks={sheetBreaks}
 			bottomClose={false}
 			closable={Boolean(selected)}
+			autoPresent
 			events={{
 				onClose: closeSelection,
 				onBackdropTap: closeSelection
 			}}
 		>
+			{#snippet peek()}
+				{#if selected}
+					<div class="block-peek">
+						<strong>{selected.name}</strong>
+						{#if selected.height_m != null}
+							<span>{selected.height_m} m</span>
+						{/if}
+					</div>
+				{:else}
+					<FilterPanel
+						compact
+						{filters}
+						blockCount={markers.length}
+						{truncated}
+						{loading}
+					/>
+				{/if}
+			{/snippet}
 			{#if selected}
 				<BlockPanel
 					block={selected}
@@ -214,9 +260,6 @@
 					embedded
 					{filters}
 					user={data.user}
-					blockCount={markers.length}
-					{truncated}
-					{loading}
 					usingSeedData={data.usingSeedData}
 					onchange={(f) => {
 						filters = f;
@@ -228,9 +271,6 @@
 		<FilterPanel
 			{filters}
 			user={data.user}
-			blockCount={markers.length}
-			{truncated}
-			{loading}
 			usingSeedData={data.usingSeedData}
 			onchange={(f) => {
 				filters = f;
@@ -256,5 +296,67 @@
 		width: 100vw;
 		height: 100dvh;
 		overflow: hidden;
+	}
+
+	.brand-mark {
+		position: absolute;
+		top: max(0.7rem, env(safe-area-inset-top));
+		left: max(0.9rem, env(safe-area-inset-left));
+		z-index: 4;
+		margin: 0;
+		padding: 0.28rem 0.6rem 0.32rem;
+		background: color-mix(in srgb, var(--panel) 10%, transparent);
+		backdrop-filter: blur(8px);
+		border-radius: 4px;
+		pointer-events: none;
+	}
+
+	.brand-mark h1 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.4rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		line-height: 1.1;
+		color: var(--ink);
+	}
+
+	.brand-mark p {
+		margin: 0.15rem 0 0;
+		font-family: var(--font-display);
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.brand-mark span {
+		display: block;
+		margin-top: 0.1rem;
+		font-family: var(--font-body);
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: var(--amber, #c4783a);
+	}
+
+	.block-peek {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.block-peek strong {
+		font-family: var(--font-display);
+		font-size: 1.05rem;
+		font-weight: 700;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.block-peek span {
+		flex-shrink: 0;
+		font-size: 0.8rem;
+		color: var(--muted);
 	}
 </style>

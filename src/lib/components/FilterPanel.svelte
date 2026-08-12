@@ -4,24 +4,27 @@
 
 	type Props = {
 		filters: BlockFilters;
-		blockCount: number;
+		blockCount?: number;
 		user?: User | null;
 		truncated?: boolean;
 		loading?: boolean;
 		usingSeedData?: boolean;
 		/** When true, render as sheet content (no absolute overlay chrome). */
 		embedded?: boolean;
+		/** One-line summary of active filters (for the sheet peek). */
+		compact?: boolean;
 		onchange?: (filters: BlockFilters) => void;
 	};
 
 	let {
 		filters,
-		blockCount,
+		blockCount = 0,
 		user = null,
 		truncated = false,
 		loading = false,
 		usingSeedData = false,
 		embedded = false,
+		compact = false,
 		onchange
 	}: Props = $props();
 
@@ -32,14 +35,46 @@
 			: [...filters.sources, source];
 		onchange?.({ ...filters, sources: sources.length ? sources : [source] });
 	}
+
+	const chips = $derived.by(() => {
+		const items: string[] = [];
+		if (filters.minScore > 0) items.push(`${filters.minScore}+`);
+		if (filters.minHeight > 0) items.push(`${filters.minHeight} m`);
+		if (filters.minArea > 0) items.push(`${filters.minArea} m²`);
+		if (filters.sources.length === 1) {
+			items.push(filters.sources[0] === 'fornsok' ? 'Fornsök' : 'Användare');
+		}
+		if (filters.photoFilter === 'with') items.push('Med bild');
+		if (filters.photoFilter === 'without') items.push('Utan bild');
+		if (filters.favoritesOnly) items.push('Favoriter');
+		return items;
+	});
 </script>
 
+{#if compact}
+	<div class="peek">
+		<strong class="peek-count">
+			{#if loading}
+				…
+			{:else}
+				{blockCount} st block i vyn
+				{#if truncated}
+					<span class="peek-trunc">· zooma in</span>
+				{/if}
+			{/if}
+		</strong>
+		<div class="peek-chips">
+			{#if chips.length === 0}
+				<span class="chip quiet">Alla filter</span>
+			{:else}
+				{#each chips as chip (chip)}
+					<span class="chip">{chip}</span>
+				{/each}
+			{/if}
+		</div>
+	</div>
+{:else}
 <aside class="panel" class:embedded>
-	<header>
-		<p class="brand">Stenkoll</p>
-		<p class="tagline">Flyttblock med klätterpotential</p>
-	</header>
-
 	{#if usingSeedData}
 		<p class="seed-note">Supabase saknas. Konfigurera <code>.env</code> för live-data.</p>
 	{/if}
@@ -142,17 +177,6 @@
 		<p class="fav-hint"><a href="/auth">Logga in</a> för att spara favoriter</p>
 	{/if}
 
-	<p class="count">
-		{#if loading}
-			Laddar…
-		{:else}
-			{blockCount} block{blockCount === 1 ? '' : 's'} i vyn
-			{#if truncated}
-				<span class="trunc">(max — zooma in)</span>
-			{/if}
-		{/if}
-	</p>
-
 	<nav class="links">
 		<a href="/add">Lägg till block</a>
 		{#if user}
@@ -162,11 +186,12 @@
 		{/if}
 	</nav>
 </aside>
+{/if}
 
 <style>
 	.panel {
 		position: absolute;
-		top: 1rem;
+		top: 4.5rem;
 		left: 1rem;
 		z-index: 5;
 		width: min(300px, calc(100vw - 2rem));
@@ -204,24 +229,8 @@
 		}
 	}
 
-	.brand {
-		margin: 0;
-		font-family: var(--font-display);
-		font-size: 1.35rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		line-height: 1.15;
-		color: var(--ink);
-	}
-
-	.tagline {
-		margin: 0.25rem 0 0;
-		font-size: 0.8rem;
-		color: var(--muted);
-	}
-
 	.seed-note {
-		margin: 0.75rem 0 0;
+		margin: 0;
 		padding: 0.45rem 0.55rem;
 		font-size: 0.72rem;
 		line-height: 1.35;
@@ -234,7 +243,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.35rem;
-		margin: 1rem 0 0;
+		margin: 0.85rem 0 0;
 		border: none;
 		padding: 0;
 		font-size: 0.78rem;
@@ -303,21 +312,8 @@
 		border-radius: 2px;
 	}
 
-	.count {
-		margin: 1rem 0 0;
-		font-family: var(--font-display);
-		font-size: 0.95rem;
-		color: var(--ink);
-	}
-
-	.trunc {
-		display: block;
-		margin-top: 0.2rem;
-		font-family: var(--font-body);
-		font-size: 0.72rem;
-		color: var(--amber, #c4783a);
-		text-transform: none;
-		letter-spacing: 0;
+	.panel > .field:first-child {
+		margin-top: 0;
 	}
 
 	.links {
@@ -337,6 +333,63 @@
 
 	.links a:hover {
 		color: var(--ink);
+	}
+
+	.peek {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		min-width: 0;
+	}
+
+	.peek-count {
+		flex-shrink: 0;
+		font-family: var(--font-display);
+		font-size: 0.92rem;
+		font-weight: 700;
+		color: var(--ink);
+		line-height: 1.2;
+		white-space: nowrap;
+	}
+
+	.peek-trunc {
+		font-family: var(--font-body);
+		font-weight: 500;
+		color: var(--amber, #c4783a);
+	}
+
+	.peek-chips {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		min-width: 0;
+		overflow-x: auto;
+		scrollbar-width: none;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.peek-chips::-webkit-scrollbar {
+		display: none;
+	}
+
+	.chip {
+		flex-shrink: 0;
+		padding: 0.18rem 0.45rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		color: var(--moss-deep);
+		background: color-mix(in srgb, var(--moss) 18%, var(--chalk));
+		border: 1px solid color-mix(in srgb, var(--moss) 35%, var(--line));
+		border-radius: 999px;
+		white-space: nowrap;
+	}
+
+	.chip.quiet {
+		font-weight: 500;
+		color: var(--muted);
+		background: transparent;
+		border-color: var(--line);
 	}
 
 	@media (max-width: 640px) {

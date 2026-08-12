@@ -20,7 +20,10 @@
 		breaks?: Breaks;
 		bottomClose?: boolean;
 		closable?: boolean;
+		autoPresent?: boolean;
 		events?: SheetEvents;
+		/** Always-visible row under the handle (shown at the small snap). */
+		peek?: import('svelte').Snippet;
 		children?: import('svelte').Snippet;
 	}
 
@@ -31,11 +34,13 @@
 		breaks = {
 			top: { enabled: true, height: 600 },
 			middle: { enabled: true, height: 300 },
-			bottom: { enabled: true, height: 56 }
+			bottom: { enabled: true, height: 50 }
 		},
 		bottomClose = true,
 		closable = true,
+		autoPresent = false,
 		events = {},
+		peek,
 		children
 	}: Props = $props();
 
@@ -50,9 +55,9 @@
 	let contentElement = $state<HTMLDivElement | undefined>(undefined);
 	let dragStarted = false;
 	let dragThreshold = 10;
-	let viewportHeight = $state(800);
+	let initialScrollTop = 0;
 
-	const translateY = spring(800, {
+	const translateY = spring(typeof window !== 'undefined' ? window.innerHeight : 800, {
 		stiffness: 0.3,
 		damping: 1
 	});
@@ -62,7 +67,7 @@
 	}
 
 	function getTranslateYForBreak(breakName: string) {
-		return Math.max(0, viewportHeight - getHeightForBreak(breakName));
+		return Math.max(0, window.innerHeight - getHeightForBreak(breakName));
 	}
 
 	export function present({ animate = true } = {}) {
@@ -80,7 +85,7 @@
 
 	export function destroy({ animate = true } = {}) {
 		backdropVisible = false;
-		const targetY = viewportHeight;
+		const targetY = window.innerHeight;
 
 		if (animate) {
 			translateY.set(targetY).then(() => {
@@ -102,6 +107,10 @@
 		else translateY.set(targetY, { hard: true });
 	}
 
+	export function getCurrentBreak() {
+		return currentBreak;
+	}
+
 	export function disableDrag() {
 		dragEnabled = false;
 	}
@@ -118,7 +127,7 @@
 		startHeight = $translateY;
 
 		if (contentElement) {
-			void contentElement.scrollTop;
+			initialScrollTop = contentElement.scrollTop;
 		}
 	}
 
@@ -130,12 +139,15 @@
 
 		if (contentElement) {
 			const isAtTop = contentElement.scrollTop <= 0;
+			const isAtBottom =
+				contentElement.scrollTop + contentElement.clientHeight >=
+				contentElement.scrollHeight - 1;
 
 			if (deltaY < 0 && !isAtTop && !isDragging) {
 				return;
 			}
 
-			if (deltaY > 0 && !isAtTop && !isDragging && absDeltaY < dragThreshold) {
+			if (deltaY > 0 && !isAtBottom && !isDragging && absDeltaY < dragThreshold) {
 				return;
 			}
 		}
@@ -147,7 +159,7 @@
 		if (!isDragging) return;
 
 		const newY = startHeight + deltaY;
-		const maxY = viewportHeight;
+		const maxY = window.innerHeight;
 		const minY = Math.max(0, getTranslateYForBreak('top'));
 
 		translateY.set(Math.max(minY, Math.min(maxY, newY)), { hard: true });
@@ -164,6 +176,7 @@
 		if (!wasDragging) return;
 
 		const currentY = $translateY;
+		const windowHeight = window.innerHeight;
 
 		let closestBreak = currentBreak;
 		let minDistance = Infinity;
@@ -180,7 +193,7 @@
 			}
 		}
 
-		if (bottomClose && closestBreak === 'bottom' && currentY > viewportHeight - 200) {
+		if (bottomClose && closestBreak === 'bottom' && currentY > windowHeight - 200) {
 			destroy({ animate: true });
 			return;
 		}
@@ -233,18 +246,16 @@
 	}
 
 	function onResize() {
-		viewportHeight = window.innerHeight;
 		if (isPresented) {
 			translateY.set(getTranslateYForBreak(currentBreak), { hard: true });
 		}
 	}
 
 	onMount(() => {
-		viewportHeight = window.innerHeight;
-		translateY.set(viewportHeight, { hard: true });
 		window.addEventListener('resize', onResize);
 		window.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('mouseup', onMouseUp);
+		if (autoPresent) present({ animate: false });
 	});
 
 	onDestroy(() => {
@@ -253,7 +264,7 @@
 		window.removeEventListener('mouseup', onMouseUp);
 	});
 
-	let contentMaxHeight = $derived(viewportHeight - $translateY - 52);
+	let contentMaxHeight = $derived(window.innerHeight - $translateY - 60);
 	let currentBreakName = $derived(currentBreak);
 
 	$effect(() => {
@@ -282,6 +293,7 @@
 {#if isPresented}
 	<div
 		class="bottom-sheet-container"
+		class:at-bottom={currentBreak === 'bottom'}
 		role="dialog"
 		aria-modal={backdrop ? 'true' : 'false'}
 		aria-label="Panel"
@@ -293,12 +305,7 @@
 		ontouchend={onTouchEnd}
 	>
 		{#if closable}
-			<button
-				type="button"
-				class="close-button"
-				onclick={handleClose}
-				aria-label="Stäng"
-			>
+			<button type="button" class="close-button" onclick={handleClose} aria-label="Stäng">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="22"
@@ -319,6 +326,12 @@
 		<div class="pane-handle" aria-hidden="true">
 			<div class="pane-handle-bar"></div>
 		</div>
+
+		{#if peek}
+			<div class="pane-peek">
+				{@render peek()}
+			</div>
+		{/if}
 
 		<div
 			class="pane-content"
@@ -348,7 +361,7 @@
 		left: 0;
 		right: 0;
 		top: 0;
-		height: 100dvh;
+		height: 100vh;
 		background: color-mix(in srgb, var(--panel) 96%, transparent);
 		backdrop-filter: blur(12px);
 		color: var(--ink);
@@ -367,6 +380,10 @@
 
 	.bottom-sheet-container:active {
 		cursor: grabbing;
+	}
+
+	.bottom-sheet-container.at-bottom {
+		padding-bottom: env(safe-area-inset-bottom);
 	}
 
 	.close-button {
@@ -398,12 +415,18 @@
 	}
 
 	.pane-handle {
-		padding: 10px 0 6px;
+		padding: 8px 0 4px;
 		cursor: grab;
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		flex-shrink: 0;
+	}
+
+	.pane-peek {
+		flex-shrink: 0;
+		padding: 0 1.1rem 0.55rem;
+		min-height: 2.1rem;
 	}
 
 	.pane-handle:active {
@@ -412,7 +435,7 @@
 
 	.pane-handle-bar {
 		width: 36px;
-		height: 4px;
+		height: 5px;
 		background: var(--muted);
 		opacity: 0.45;
 		border-radius: 3px;
