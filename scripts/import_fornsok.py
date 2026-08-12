@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Import climb-relevant lämningar from RAÄ Kulturhistoriska lämningar GeoPackage.
+"""Export climb-relevant lämningar from RAÄ Kulturhistoriska lämningar GeoPackage.
 
 Supports the post-2025 relational GPKG (tables: lamning, egenskap, point/…).
 Keeps rows where any keyword appears in lämningstyp, egenskap.varde,
-beskrivning or lamningsnamn. Optionally clips to a bbox (default Hallandsåsen),
-scores climb potential 1–5 via Gemini, and upserts into Supabase.
+beskrivning or lamningsnamn. Writes JSON batch files for manual/AI scoring;
+use upsert_blocks.py to load scored files into Supabase.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sqlite3
-import time
 from pathlib import Path
 from typing import Any
 
@@ -23,9 +21,6 @@ from dotenv import load_dotenv
 # Project root .env
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
-
-# Default Hallandsåsen bbox: (minx, miny, maxx, maxy) in WGS84
-HALLANDSASEN_BBOX = (12.75, 56.20, 13.30, 56.40)
 
 # Match if any keyword appears in key text fields (substring, case-insensitive).
 KEYWORDS = (
@@ -41,18 +36,42 @@ KEYWORDS = (
     "stenblock med tradition",
 )
 
-SCORE_SYSTEM = """Du är en erfaren boulderer som bedömer svenska flyttblock utifrån
-fornlämningsbeskrivningar. Ge en poäng 1–5 för hur sannolikt det är att objektet
-är ett bra klätterblock (boulder), baserat ENBART på texten.
+DEFAULT_OUT_DIR = Path(__file__).resolve().parent / "scoring_batches"
+DEFAULT_BATCH_SIZE = 40
 
+SCORING_INSTRUCTIONS = """Fill climb_score (1–5) and score_rationale (one Swedish sentence)
+for each record. Adjust height_m / length_m / width_m / area_m2 when the
+description states measures that parsed_size missed; set size_source to
+"manual" if you change measures. Do not invent sizes.
+
+Poängregler (höjd styr taket):
 1 = olämpligt (för litet, nedgrävt, runt, ingen vägg)
 2 = svag potential
-3 = möjlig, osäker
-4 = lovande (tydlig höjd/vägg)
-5 = stark kandidat (stort, lodrätt/överhäng, tydliga mått)
+3 = möjlig, osäker — max om höjd ≤ 2 m eller okänd men tveksam
+4 = lovande — ENDAST om höjd > 2 m
+5 = stark kandidat — ENDAST om höjd > 3 m
 
-Svara ENDAST med JSON: {"score": <1-5>, "rationale": "<en mening på svenska>"}
+Om höjd är okänd: var konservativ (sällan över 3).
+area_m2 = length_m * width_m när båda finns, annars null.
 """
+
+# "4x3x2 m", "4 x 3 x 2,5 m", "3×2×1,5 m"
+_DIM3 = re.compile(
+    r"(?P<a>\d+(?:[.,]\d+)?)\s*[x×]\s*(?P<b>\d+(?:[.,]\d+)?)\s*[x×]\s*(?P<c>\d+(?:[.,]\d+)?)\s*m\b",
+    re.IGNORECASE,
+)
+# "4x3 m" (two dims — length x width, height unknown)
+_DIM2 = re.compile(
+    r"(?P<a>\d+(?:[.,]\d+)?)\s*[x×]\s*(?P<b>\d+(?:[.,]\d+)?)\s*m\b",
+    re.IGNORECASE,
+)
+# "höjd ca 2,5 m", "h 2 m", "2,5 m hög", "högt 3 m"
+_HEIGHT = re.compile(
+    r"(?:höjd(?:en)?|h\.?)\s*(?:ca\.?|cirka|omkr\.?|approx\.?)?\s*"
+    r"(?P<h>\d+(?:[.,]\d+)?)\s*m\b"
+    r"|(?P<h2>\d+(?:[.,]\d+)?)\s*m\s*(?:hög|högt|i\s*höjd)",
+    re.IGNORECASE,
+)
 
 
 def _norm(s: str) -> str:
@@ -64,6 +83,50 @@ def _is_blank(val: Any) -> bool:
         return True
     s = str(val).strip()
     return s == "" or s.lower() == "nan" or s.lower() == "none"
+
+
+def _parse_num(s: str) -> float:
+    return float(s.replace(",", "."))
+
+
+def parse_size(description: str) -> dict[str, float | None]:
+    """Extract height/length/width/area from Fornsök-style measure phrases."""
+    text = description or ""
+    height: float | None = None
+    length: float | None = None
+    width: float | None = None
+
+    m3 = _DIM3.search(text)
+    if m3:
+        dims = sorted(
+            (_parse_num(m3.group("a")), _parse_num(m3.group("b")), _parse_num(m3.group("c"))),
+            reverse=True,
+        )
+        # Convention in RAÄ: often L x B x H with H smallest, but not always.
+        # Prefer smallest as height when all three present (boulder footprint).
+        length, width, height = dims[0], dims[1], dims[2]
+    else:
+        m2 = _DIM2.search(text)
+        if m2:
+            a, b = _parse_num(m2.group("a")), _parse_num(m2.group("b"))
+            length, width = max(a, b), min(a, b)
+
+    hm = _HEIGHT.search(text)
+    if hm:
+        raw = hm.group("h") or hm.group("h2")
+        if raw:
+            height = _parse_num(raw)
+
+    area: float | None = None
+    if length is not None and width is not None:
+        area = round(length * width, 2)
+
+    return {
+        "height_m": height,
+        "length_m": length,
+        "width_m": width,
+        "area_m2": area,
+    }
 
 
 def list_gpkg(path: Path) -> None:
@@ -108,9 +171,7 @@ def _matched_keywords(*texts: str) -> list[str]:
     return [kw for kw in KEYWORDS if kw in blob]
 
 
-def load_filtered_relational(
-    gpkg: Path, bbox: tuple[float, float, float, float] | None
-):
+def load_filtered_relational(gpkg: Path):
     """Load from RAÄ relational GPKG (lamning + egenskap + geometries)."""
     import geopandas as gpd
     import pandas as pd
@@ -235,10 +296,6 @@ def load_filtered_relational(
     merged = attrs.merge(geoms[["uuid", "geometry"]], on="uuid", how="inner")
     gdf = gpd.GeoDataFrame(merged, geometry="geometry", crs="EPSG:4326")
 
-    if bbox is not None:
-        minx, miny, maxx, maxy = bbox
-        gdf = gdf.cx[minx:maxx, miny:maxy].copy()
-
     cols = {
         "typ": "lamningstyp",
         "egenskap": "egenskapsvarde",
@@ -257,60 +314,6 @@ def load_filtered_relational(
     )
     print(f"Keywords: {', '.join(KEYWORDS)}")
     return gdf, cols
-
-
-def score_description(
-    client: Any,
-    model: str,
-    description: str,
-    *,
-    retries: int = 6,
-) -> tuple[int | None, str | None]:
-    from google.genai import types
-    from google.genai.errors import APIError, ServerError
-
-    if not description.strip():
-        return None, "Ingen beskrivning att bedöma."
-
-    last_err: Exception | None = None
-    for attempt in range(retries):
-        try:
-            resp = client.models.generate_content(
-                model=model,
-                contents=description[:4000],
-                config=types.GenerateContentConfig(
-                    system_instruction=SCORE_SYSTEM,
-                    temperature=0.2,
-                    response_mime_type="application/json",
-                ),
-            )
-            raw = resp.text or "{}"
-            try:
-                data = json.loads(raw)
-                if isinstance(data, list):
-                    data = data[0] if data else {}
-                if not isinstance(data, dict):
-                    return None, f"Kunde inte tolka LLM-svar: {raw[:200]}"
-                score = int(data.get("score"))
-                rationale = str(data.get("rationale", "")).strip() or None
-                if score < 1 or score > 5:
-                    return None, rationale
-                return score, rationale
-            except (json.JSONDecodeError, TypeError, ValueError):
-                return None, f"Kunde inte tolka LLM-svar: {raw[:200]}"
-        except (ServerError, APIError) as e:
-            last_err = e
-            status = getattr(e, "status_code", None) or getattr(e, "code", None)
-            # Retry transient service / rate-limit errors.
-            if status not in (429, 500, 502, 503, 504) and attempt == 0:
-                # Some SDK versions only expose message text.
-                msg = str(e).upper()
-                if not any(x in msg for x in ("429", "500", "502", "503", "504", "UNAVAILABLE", "RESOURCE_EXHAUSTED")):
-                    raise
-            delay = min(60.0, (2**attempt) + (0.25 * attempt))
-            time.sleep(delay)
-
-    raise SystemExit(f"Gemini API failed after {retries} retries: {last_err}")
 
 
 def row_to_record(row: Any, cols: dict[str, str | None]) -> dict[str, Any] | None:
@@ -345,6 +348,9 @@ def row_to_record(row: Any, cols: dict[str, str | None]) -> dict[str, Any] | Non
     if cols["egenskap"] and not _is_blank(row.get(cols["egenskap"])):
         egenskapsvarde = str(row[cols["egenskap"]]).strip()
 
+    parsed = parse_size(desc)
+    has_parsed = any(parsed.get(k) is not None for k in parsed)
+
     return {
         "source": "fornsok",
         "fornsok_id": fornsok_id,
@@ -364,85 +370,93 @@ def row_to_record(row: Any, cols: dict[str, str | None]) -> dict[str, Any] | Non
             if cols["municipality"] and not _is_blank(row.get(cols["municipality"]))
             else None
         ),
+        # Fill these when scoring:
         "climb_score": None,
         "score_rationale": None,
-        "created_by": None,
+        # Prefill from regex; edit if wrong/incomplete:
+        "height_m": parsed.get("height_m"),
+        "length_m": parsed.get("length_m"),
+        "width_m": parsed.get("width_m"),
+        "area_m2": parsed.get("area_m2"),
+        "size_source": "parsed" if has_parsed else None,
     }
 
 
-def supabase_client():
-    from supabase import create_client
+def write_scoring_batches(
+    records: list[dict[str, Any]],
+    out_dir: Path,
+    *,
+    batch_size: int,
+) -> list[Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Clear previous batch_*.json so renumbering stays contiguous.
+    for old in out_dir.glob("batch_*.json"):
+        old.unlink()
 
-    url = os.environ.get("PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not url or not key:
-        raise SystemExit("Need PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env")
-    return create_client(url, key)
+    paths: list[Path] = []
+    batch_size = max(1, batch_size)
+    total_batches = (len(records) + batch_size - 1) // batch_size if records else 0
 
-
-def fetch_scored_fornsok_ids() -> set[str]:
-    """fornsok_ids that already have a climb_score (for resume)."""
-    client = supabase_client()
-    scored: set[str] = set()
-    page_size = 1000
-    start = 0
-    while True:
-        end = start + page_size - 1
-        resp = (
-            client.table("blocks")
-            .select("fornsok_id")
-            .eq("source", "fornsok")
-            .not_.is_("climb_score", "null")
-            .range(start, end)
-            .execute()
+    for i in range(0, len(records), batch_size):
+        batch_num = i // batch_size + 1
+        chunk = records[i : i + batch_size]
+        path = out_dir / f"batch_{batch_num:03d}.json"
+        payload = {
+            "batch": batch_num,
+            "total_batches": total_batches,
+            "count": len(chunk),
+            "instructions": SCORING_INSTRUCTIONS.strip(),
+            "records": chunk,
+        }
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
         )
-        rows = resp.data or []
-        for row in rows:
-            fid = row.get("fornsok_id")
-            if fid:
-                scored.add(str(fid))
-        if len(rows) < page_size:
-            break
-        start += page_size
-    return scored
+        paths.append(path)
 
-
-def upsert_records(records: list[dict[str, Any]], *, quiet: bool = False) -> None:
-    client = supabase_client()
-    chunk = 50
-    for i in range(0, len(records), chunk):
-        part = records[i : i + chunk]
-        client.table("blocks").upsert(part, on_conflict="fornsok_id").execute()
-        if not quiet:
-            print(f"  upserted {min(i + chunk, len(records))}/{len(records)}")
+    manifest = {
+        "total_records": len(records),
+        "batch_size": batch_size,
+        "batches": [p.name for p in paths],
+        "instructions": SCORING_INSTRUCTIONS.strip(),
+        "next_steps": [
+            "Edit climb_score and score_rationale in each batch_XXX.json",
+            "Then: python upsert_blocks.py --dir ./scoring_batches",
+        ],
+    }
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (out_dir / "SCORING.md").write_text(
+        "# Scoring batches\n\n"
+        + SCORING_INSTRUCTIONS.strip()
+        + "\n\n## Workflow\n\n"
+        "1. Open `batch_XXX.json` and fill `climb_score` / `score_rationale`.\n"
+        "2. Adjust size fields if needed; set `size_source` to `manual` when changed.\n"
+        "3. Upsert: `python upsert_blocks.py --dir ./scoring_batches`\n",
+        encoding="utf-8",
+    )
+    return paths
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gpkg", type=Path, required=True, help="Path to RAÄ GeoPackage")
     parser.add_argument("--list-columns", action="store_true")
-    parser.add_argument("--dry-run", action="store_true", help="Print counts, no LLM/DB")
-    parser.add_argument("--skip-llm", action="store_true")
-    parser.add_argument("--no-bbox", action="store_true", help="Import all Sweden")
+    parser.add_argument("--dry-run", action="store_true", help="Print sample records, write nothing")
+    parser.add_argument("--limit", type=int, default=None, help="Max records to export")
     parser.add_argument(
-        "--bbox",
-        nargs=4,
-        type=float,
-        metavar=("MINX", "MINY", "MAXX", "MAXY"),
-        help="Custom WGS84 bbox",
+        "--out-dir",
+        type=Path,
+        default=DEFAULT_OUT_DIR,
+        help=f"Directory for batch JSON files (default {DEFAULT_OUT_DIR})",
     )
-    parser.add_argument("--limit", type=int, default=None, help="Max records to process")
-    parser.add_argument("--sleep", type=float, default=0.15, help="Delay between LLM calls")
     parser.add_argument(
-        "--upsert-every",
+        "--batch-size",
         type=int,
-        default=25,
-        help="Upsert scored records every N LLM calls (0 = only at end)",
-    )
-    parser.add_argument(
-        "--rescore",
-        action="store_true",
-        help="Score all records even if climb_score already exists",
+        default=DEFAULT_BATCH_SIZE,
+        help=f"Records per batch file (default {DEFAULT_BATCH_SIZE})",
     )
     args = parser.parse_args()
 
@@ -459,9 +473,8 @@ def main() -> None:
             "(RAÄ structure from okt 2025). Re-download lämningar_sverige.gpkg."
         )
 
-    bbox = None if args.no_bbox else tuple(args.bbox) if args.bbox else HALLANDSASEN_BBOX
-    print(f"Loading {args.gpkg} bbox={bbox} …")
-    filtered, cols = load_filtered_relational(args.gpkg, bbox)
+    print(f"Loading {args.gpkg} …")
+    filtered, cols = load_filtered_relational(args.gpkg)
     print(f"Filtered rows with geometry: {len(filtered)}")
 
     records: list[dict[str, Any]] = []
@@ -474,71 +487,31 @@ def main() -> None:
 
     print(f"Records with geometry+id: {len(records)}")
     if args.dry_run:
-        sample = filtered.head(5)
-        for _, row in sample.iterrows():
-            rec = row_to_record(row, cols)
-            if not rec:
-                continue
-            payload = {
-                "fornsok_id": rec["fornsok_id"],
-                "name": rec["name"],
-                "lamningstyp": rec["lamningstyp"],
-                "egenskapsvarde": rec["egenskapsvarde"],
-                "matched_keywords": row.get("matched_keywords"),
-                "lat": rec["lat"],
-                "lng": rec["lng"],
-            }
-            print(json.dumps(payload, ensure_ascii=False))
+        for rec in records[:5]:
+            print(
+                json.dumps(
+                    {
+                        "fornsok_id": rec["fornsok_id"],
+                        "name": rec["name"],
+                        "lamningstyp": rec["lamningstyp"],
+                        "egenskapsvarde": rec["egenskapsvarde"],
+                        "lat": rec["lat"],
+                        "lng": rec["lng"],
+                        "height_m": rec["height_m"],
+                        "length_m": rec["length_m"],
+                        "width_m": rec["width_m"],
+                    },
+                    ensure_ascii=False,
+                )
+            )
         print("Dry run complete.")
         return
 
-    if not args.skip_llm:
-        from google import genai
-
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not api_key:
-            raise SystemExit("GEMINI_API_KEY required (or use --skip-llm)")
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-        gemini = genai.Client(api_key=api_key)
-
-        to_score = records
-        if not args.rescore:
-            already = fetch_scored_fornsok_ids()
-            if already:
-                to_score = [r for r in records if r["fornsok_id"] not in already]
-                print(f"Skipping {len(records) - len(to_score)} already scored; {len(to_score)} left")
-
-        print(f"Scoring with {model} …")
-        try:
-            from tqdm import tqdm
-
-            iterator = tqdm(to_score)
-        except ImportError:
-            iterator = to_score
-
-        pending: list[dict[str, Any]] = []
-        for rec in iterator:
-            score, rationale = score_description(gemini, model, rec.get("description") or "")
-            rec["climb_score"] = score
-            rec["score_rationale"] = rationale
-            pending.append(rec)
-            if args.upsert_every and len(pending) >= args.upsert_every:
-                upsert_records(pending, quiet=True)
-                pending.clear()
-            time.sleep(args.sleep)
-
-        if pending:
-            print(f"Upserting final {len(pending)} scored records …")
-            upsert_records(pending)
-        elif args.upsert_every:
-            print("All scored batches already upserted.")
-        else:
-            print("Upserting to Supabase …")
-            upsert_records(to_score)
-    else:
-        print("Upserting to Supabase …")
-        upsert_records(records)
-
+    out_dir = args.out_dir if args.out_dir.is_absolute() else Path.cwd() / args.out_dir
+    paths = write_scoring_batches(records, out_dir, batch_size=args.batch_size)
+    print(f"Wrote {len(paths)} batch files ({len(records)} records) → {out_dir}")
+    print("Score climb_score/score_rationale in the JSON files, then run:")
+    print(f"  python upsert_blocks.py --dir {out_dir}")
     print("Done.")
 
 
