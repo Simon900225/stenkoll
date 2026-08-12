@@ -32,12 +32,15 @@ export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
 	const minScore = Number(params.get('minScore') ?? '0');
 	const minHeight = Number(params.get('minHeight') ?? '0');
 	const minArea = Number(params.get('minArea') ?? '0');
+	const favoritesOnly =
+		params.get('favoritesOnly') === '1' || params.get('favoritesOnly') === 'true';
 	return {
 		minScore: Number.isFinite(minScore) ? Math.min(5, Math.max(0, minScore)) : 0,
 		minHeight: Number.isFinite(minHeight) ? Math.max(0, minHeight) : 0,
 		minArea: Number.isFinite(minArea) ? Math.max(0, minArea) : 0,
 		sources: parseSources(params.get('sources')),
-		photoFilter: parsePhotoFilter(params.get('photoFilter'))
+		photoFilter: parsePhotoFilter(params.get('photoFilter')),
+		favoritesOnly
 	};
 }
 
@@ -64,6 +67,28 @@ export async function queryViewportBlocks(
 
 	const padded = padBBox(bbox);
 	const supabase = createSupabaseServerClient(cookies);
+
+	let favoriteIds: string[] | null = null;
+	if (filters.favoritesOnly) {
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) {
+			return { blocks: [], truncated: false, usingSeedData: false };
+		}
+		const { data: favRows, error: favError } = await supabase
+			.from('favorites')
+			.select('block_id')
+			.eq('user_id', user.id);
+		if (favError) {
+			return { blocks: [], truncated: false, usingSeedData: false };
+		}
+		favoriteIds = (favRows ?? []).map((r) => r.block_id);
+		if (favoriteIds.length === 0) {
+			return { blocks: [], truncated: false, usingSeedData: false };
+		}
+	}
+
 	let query = supabase
 		.from('blocks')
 		.select(MARKER_COLUMNS)
@@ -91,6 +116,10 @@ export async function queryViewportBlocks(
 		query = query.eq('has_photo', true);
 	} else if (filters.photoFilter === 'without') {
 		query = query.eq('has_photo', false);
+	}
+
+	if (favoriteIds) {
+		query = query.in('id', favoriteIds);
 	}
 
 	const { data, error } = await query;

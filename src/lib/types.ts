@@ -48,12 +48,33 @@ export type Profile = {
 
 export type PhotoFilter = 'all' | 'with' | 'without';
 
+export type Favorite = {
+	user_id: string;
+	block_id: string;
+	created_at: string;
+};
+
+export type Comment = {
+	id: string;
+	block_id: string;
+	user_id: string;
+	body: string;
+	created_at: string;
+};
+
+/** Comment row with author display name for UI. */
+export type CommentWithAuthor = Comment & {
+	display_name: string | null;
+};
+
 export type BlockFilters = {
 	minScore: number;
 	minHeight: number;
 	minArea: number;
 	sources: BlockSource[];
 	photoFilter: PhotoFilter;
+	/** When true, only blocks the current user has favourited. */
+	favoritesOnly: boolean;
 };
 
 /** Slim marker payload for viewport queries (no long text fields). */
@@ -138,6 +159,28 @@ type Tables = {
 			created_at?: string;
 		};
 		Update: Partial<Tables['profiles']['Insert']>;
+		Relationships: [];
+	};
+	favorites: {
+		Row: Favorite;
+		Insert: {
+			user_id: string;
+			block_id: string;
+			created_at?: string;
+		};
+		Update: Partial<Tables['favorites']['Insert']>;
+		Relationships: [];
+	};
+	comments: {
+		Row: Comment;
+		Insert: {
+			id?: string;
+			block_id: string;
+			user_id: string;
+			body: string;
+			created_at?: string;
+		};
+		Update: Partial<Tables['comments']['Insert']>;
 		Relationships: [];
 	};
 };

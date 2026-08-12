@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { createSupabaseServerClient, isSupabaseConfigured } from '$lib/supabase/client';
 import { BLOCK_DETAIL_COLUMNS, fornsokUrl } from '$lib/blocks';
 import { fail } from '@sveltejs/kit';
-import type { Block } from '$lib/types';
+import type { Block, CommentWithAuthor } from '$lib/types';
 
 export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const { user, usingSeedData } = await parent();
@@ -26,21 +26,64 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		error(404, 'Blocket hittades inte');
 	}
 
-	const { data: photos } = await supabase
-		.from('photos')
-		.select('id, block_id, user_id, storage_path, caption, created_at')
-		.eq('block_id', resolved.id)
-		.order('created_at', { ascending: false });
+	const [{ data: photos }, { data: commentRows, error: commentsError }] = await Promise.all([
+		supabase
+			.from('photos')
+			.select('id, block_id, user_id, storage_path, caption, created_at')
+			.eq('block_id', resolved.id)
+			.order('created_at', { ascending: false }),
+		supabase
+			.from('comments')
+			.select('id, block_id, user_id, body, created_at')
+			.eq('block_id', resolved.id)
+			.order('created_at', { ascending: true })
+	]);
+
+	if (commentsError) error(500, commentsError.message);
 
 	const withUrls = (photos ?? []).map((p) => {
 		const { data } = supabase.storage.from('block-photos').getPublicUrl(p.storage_path);
 		return { ...p, url: data.publicUrl };
 	});
 
+	const authorIds = [...new Set((commentRows ?? []).map((c) => c.user_id))];
+	const nameByUser = new Map<string, string | null>();
+	if (authorIds.length) {
+		const { data: profiles } = await supabase
+			.from('profiles')
+			.select('id, display_name')
+			.in('id', authorIds);
+		for (const p of profiles ?? []) {
+			nameByUser.set(p.id, p.display_name);
+		}
+	}
+
+	const comments: CommentWithAuthor[] = (commentRows ?? []).map((row) => ({
+		id: row.id,
+		block_id: row.block_id,
+		user_id: row.user_id,
+		body: row.body,
+		created_at: row.created_at,
+		display_name: nameByUser.get(row.user_id) ?? null
+	}));
+
+	let isFavorite = false;
+	if (user) {
+		const { data: fav } = await supabase
+			.from('favorites')
+			.select('block_id')
+			.eq('user_id', user.id)
+			.eq('block_id', resolved.id)
+			.maybeSingle();
+		isFavorite = Boolean(fav);
+	}
+
 	return {
 		block: resolved,
 		photos: withUrls,
+		comments,
 		fornsokLink: fornsokUrl(resolved.fornsok_id),
+		isFavorite,
 		user,
 		usingSeedData: usingSeedData ?? false
 	};
@@ -138,5 +181,99 @@ export const actions: Actions = {
 
 		if (rpcError) return fail(400, { developedError: rpcError.message });
 		return { developedSaved: true };
+	},
+
+	toggleFavorite: async ({ params, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { favoriteError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { favoriteError: 'Logga in för att spara favoriter.' });
+
+		const { data: existing } = await supabase
+			.from('favorites')
+			.select('block_id')
+			.eq('user_id', user.id)
+			.eq('block_id', params.id)
+			.maybeSingle();
+
+		if (existing) {
+			const { error: delError } = await supabase
+				.from('favorites')
+				.delete()
+				.eq('user_id', user.id)
+				.eq('block_id', params.id);
+			if (delError) return fail(400, { favoriteError: delError.message });
+			return { favoriteSaved: true, isFavorite: false };
+		}
+
+		const { error: insertError } = await supabase.from('favorites').insert({
+			user_id: user.id,
+			block_id: params.id
+		});
+		if (insertError) return fail(400, { favoriteError: insertError.message });
+		return { favoriteSaved: true, isFavorite: true };
+	},
+
+	addComment: async ({ request, params, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { commentError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { commentError: 'Logga in för att kommentera.' });
+
+		const form = await request.formData();
+		const body = String(form.get('body') ?? '').trim();
+
+		if (!body) {
+			return fail(400, { commentError: 'Skriv en kommentar.' });
+		}
+		if (body.length > 2000) {
+			return fail(400, { commentError: 'Kommentaren får vara högst 2000 tecken.' });
+		}
+
+		const { error: insertError } = await supabase.from('comments').insert({
+			block_id: params.id,
+			user_id: user.id,
+			body
+		});
+
+		if (insertError) return fail(400, { commentError: insertError.message });
+		return { commentSaved: true };
+	},
+
+	deleteComment: async ({ request, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { commentError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { commentError: 'Logga in för att ta bort kommentarer.' });
+
+		const form = await request.formData();
+		const commentId = String(form.get('comment_id') ?? '').trim();
+		if (!commentId) {
+			return fail(400, { commentError: 'Ogiltig kommentar.' });
+		}
+
+		const { error: delError } = await supabase
+			.from('comments')
+			.delete()
+			.eq('id', commentId)
+			.eq('user_id', user.id);
+
+		if (delError) return fail(400, { commentError: delError.message });
+		return { commentDeleted: true };
 	}
 };

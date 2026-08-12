@@ -49,6 +49,26 @@
 	</section>
 
 	<section class="card activity">
+		<h2>Favoriter</h2>
+		<p class="lead">Block du sparat att titta på senare.</p>
+
+		{#if data.favorites.length === 0}
+			<p class="dim">Inga favoriter ännu. Stjärnmarkera block på kartan eller blocksidan.</p>
+		{:else}
+			<ul class="list">
+				{#each data.favorites as block (block.id)}
+					<li>
+						<a href="/block/{block.id}">{block.name}</a>
+						<span class="tags">
+							<span class="tag">★</span>
+						</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card activity">
 		<h2>Dina bidrag</h2>
 		<p class="lead">Block där du laddat upp bild eller ändrat score.</p>
 

@@ -46,16 +46,21 @@ export function toMarker(block: Block): BlockMarker {
 	};
 }
 
-export function filterBlocks(blocks: Block[], filters: BlockFilters): Block[] {
-	return blocks.filter((block) => matchesFilters(block, filters));
+export function filterBlocks(
+	blocks: Block[],
+	filters: BlockFilters,
+	favoriteIds?: ReadonlySet<string>
+): Block[] {
+	return blocks.filter((block) => matchesFilters(block, filters, favoriteIds));
 }
 
 export function matchesFilters(
 	block: Pick<
 		Block,
-		'climb_score' | 'user_score' | 'height_m' | 'area_m2' | 'source' | 'has_photo'
+		'id' | 'climb_score' | 'user_score' | 'height_m' | 'area_m2' | 'source' | 'has_photo'
 	>,
-	filters: BlockFilters
+	filters: BlockFilters,
+	favoriteIds?: ReadonlySet<string>
 ): boolean {
 	const score = effectiveScore(block) ?? 0;
 	if (score < filters.minScore) return false;
@@ -64,6 +69,7 @@ export function matchesFilters(
 	if (!filters.sources.includes(block.source)) return false;
 	if (filters.photoFilter === 'with' && !block.has_photo) return false;
 	if (filters.photoFilter === 'without' && block.has_photo) return false;
+	if (filters.favoritesOnly && !(favoriteIds?.has(block.id) ?? false)) return false;
 	return true;
 }
 
@@ -181,6 +187,7 @@ export function defaultFilters(): BlockFilters {
 		minHeight: 0,
 		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],
-		photoFilter: 'all' as PhotoFilter
+		photoFilter: 'all' as PhotoFilter,
+		favoritesOnly: false
 	};
 }

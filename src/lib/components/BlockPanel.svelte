@@ -12,10 +12,24 @@
 
 	type Props = {
 		block: Block | null;
+		favorited?: boolean;
+		canFavorite?: boolean;
+		favoriteBusy?: boolean;
+		/** When true, render as sheet content (no absolute overlay chrome). */
+		embedded?: boolean;
+		onfavorite?: () => void;
 		onclose?: () => void;
 	};
 
-	let { block, onclose }: Props = $props();
+	let {
+		block,
+		favorited = false,
+		canFavorite = false,
+		favoriteBusy = false,
+		embedded = false,
+		onfavorite,
+		onclose
+	}: Props = $props();
 
 	const url = $derived(block ? fornsokUrl(block.fornsok_id) : null);
 	const score = $derived(block ? effectiveScore(block) : null);
@@ -32,10 +46,12 @@
 </script>
 
 {#if block}
-	<aside class="detail" style:--score-color={scoreColor(score)}>
-		<button type="button" class="close" onclick={() => onclose?.()} aria-label="Stäng"
-			>×</button
-		>
+	<aside class="detail" class:embedded style:--score-color={scoreColor(score)}>
+		{#if !embedded}
+			<button type="button" class="close" onclick={() => onclose?.()} aria-label="Stäng"
+				>×</button
+			>
+		{/if}
 
 		<div class="score-badge" aria-label="Score {score ?? 'okänd'}">
 			{score ?? '—'}
@@ -49,9 +65,28 @@
 			{#if block.developed}
 				<span class="badge">Utvecklad</span>
 			{/if}
+			{#if favorited}
+				<span class="badge fav">Favorit</span>
+			{/if}
 		</p>
 
-		<h2>{block.name}</h2>
+		<div class="title-row">
+			<h2>{block.name}</h2>
+			{#if canFavorite}
+				<button
+					type="button"
+					class="star"
+					class:on={favorited}
+					disabled={favoriteBusy}
+					onclick={() => onfavorite?.()}
+					aria-label={favorited ? 'Ta bort favorit' : 'Spara som favorit'}
+					aria-pressed={favorited}
+					title={favorited ? 'Ta bort favorit' : 'Spara som favorit'}
+				>
+					{favorited ? '★' : '☆'}
+				</button>
+			{/if}
+		</div>
 
 		{#if block.height_m != null || block.area_m2 != null}
 			<p class="size">
@@ -115,6 +150,22 @@
 		border-left: 3px solid var(--score-color);
 		box-shadow: 0 14px 44px rgb(0 0 0 / 0.2);
 		animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.detail.embedded {
+		position: static;
+		top: auto;
+		right: auto;
+		width: 100%;
+		padding: 0.25rem 0 0;
+		background: transparent;
+		backdrop-filter: none;
+		border: none;
+		border-left: 3px solid var(--score-color);
+		border-radius: 0;
+		padding-left: 0.75rem;
+		box-shadow: none;
+		animation: none;
 	}
 
 	@keyframes rise {
@@ -194,14 +245,63 @@
 		border-radius: 2px;
 	}
 
+	.badge.fav {
+		color: #7a4a00;
+		background: color-mix(in srgb, var(--amber) 28%, var(--chalk));
+		border-color: var(--amber);
+	}
+
+	.title-row {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.35rem;
+		margin-top: 0.35rem;
+		padding-right: 1.5rem;
+	}
+
+	.detail.embedded .title-row {
+		padding-right: 0;
+	}
+
 	h2 {
-		margin: 0.35rem 0 0;
+		margin: 0;
+		flex: 1;
 		font-family: var(--font-display);
 		font-size: 1.35rem;
 		font-weight: 700;
 		letter-spacing: -0.02em;
 		line-height: 1.2;
-		padding-right: 1.5rem;
+	}
+
+	.star {
+		flex-shrink: 0;
+		width: 2rem;
+		height: 2rem;
+		margin: -0.15rem -0.25rem 0 0;
+		padding: 0;
+		border: none;
+		background: transparent;
+		font-size: 1.35rem;
+		line-height: 1;
+		color: var(--muted);
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			transform 0.15s ease;
+	}
+
+	.star:hover:not(:disabled) {
+		color: var(--amber);
+		transform: scale(1.08);
+	}
+
+	.star.on {
+		color: var(--amber);
+	}
+
+	.star:disabled {
+		opacity: 0.55;
+		cursor: wait;
 	}
 
 	.size {
@@ -290,7 +390,7 @@
 	}
 
 	@media (max-width: 640px) {
-		.detail {
+		.detail:not(.embedded) {
 			top: auto;
 			bottom: 42vh;
 			right: 0.5rem;

@@ -10,6 +10,12 @@ export type ProfileBlock = {
 	userScore: number | null;
 };
 
+export type FavoriteBlock = {
+	id: string;
+	name: string;
+	favoritedAt: string;
+};
+
 export const load: PageServerLoad = async ({ parent, cookies }) => {
 	const { user, usingSeedData } = await parent();
 	if (!user) throw redirect(303, '/auth');
@@ -18,6 +24,7 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 		return {
 			profile: { display_name: null as string | null },
 			blocks: [] as ProfileBlock[],
+			favorites: [] as FavoriteBlock[],
 			usingSeedData: true
 		};
 	}
@@ -30,12 +37,17 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 		.eq('id', user.id)
 		.maybeSingle();
 
-	const [{ data: photoRows }, { data: scoredRows }] = await Promise.all([
+	const [{ data: photoRows }, { data: scoredRows }, { data: favoriteRows }] = await Promise.all([
 		supabase.from('photos').select('block_id').eq('user_id', user.id),
 		supabase
 			.from('blocks')
 			.select('id, name, user_score')
-			.eq('user_score_by', user.id)
+			.eq('user_score_by', user.id),
+		supabase
+			.from('favorites')
+			.select('block_id, created_at')
+			.eq('user_id', user.id)
+			.order('created_at', { ascending: false })
 	]);
 
 	const photoBlockIds = [...new Set((photoRows ?? []).map((r) => r.block_id))];
@@ -80,9 +92,30 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 		a.name.localeCompare(b.name, 'sv')
 	);
 
+	const favoriteIds = (favoriteRows ?? []).map((r) => r.block_id);
+	const favoritedAtById = new Map(
+		(favoriteRows ?? []).map((r) => [r.block_id, r.created_at])
+	);
+	let favorites: FavoriteBlock[] = [];
+	if (favoriteIds.length) {
+		const { data: favBlocks } = await supabase
+			.from('blocks')
+			.select('id, name')
+			.in('id', favoriteIds);
+		const nameById = new Map((favBlocks ?? []).map((b) => [b.id, b.name]));
+		favorites = favoriteIds
+			.filter((id) => nameById.has(id))
+			.map((id) => ({
+				id,
+				name: nameById.get(id)!,
+				favoritedAt: favoritedAtById.get(id) ?? ''
+			}));
+	}
+
 	return {
 		profile: { display_name: profile?.display_name ?? null },
 		blocks,
+		favorites,
 		usingSeedData: usingSeedData ?? false
 	};
 };

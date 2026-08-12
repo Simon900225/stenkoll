@@ -15,6 +15,9 @@
 	const block = $derived(data.block);
 	const score = $derived(effectiveScore(block));
 	const color = $derived(scoreColor(score));
+	const isFavorite = $derived(
+		form?.isFavorite !== undefined ? form.isFavorite : data.isFavorite
+	);
 	const maps = $derived({
 		google: googleMapsUrl(block.lat, block.lng),
 		flyg: lantmaterietFlygUrl(block.lat, block.lng),
@@ -66,8 +69,30 @@
 				{#if block.developed}
 					<span class="badge">Utvecklad</span>
 				{/if}
+				{#if isFavorite}
+					<span class="badge fav">Favorit</span>
+				{/if}
 			</p>
-			<h1>{block.name}</h1>
+			<div class="title-row">
+				<h1>{block.name}</h1>
+				{#if data.user && !data.usingSeedData}
+					<form method="POST" action="?/toggleFavorite" use:enhance class="star-form">
+						<button
+							type="submit"
+							class="star"
+							class:on={isFavorite}
+							aria-label={isFavorite ? 'Ta bort favorit' : 'Spara som favorit'}
+							aria-pressed={isFavorite}
+							title={isFavorite ? 'Ta bort favorit' : 'Spara som favorit'}
+						>
+							{isFavorite ? '★' : '☆'}
+						</button>
+					</form>
+				{/if}
+			</div>
+			{#if form?.favoriteError}
+				<p class="err">{form.favoriteError}</p>
+			{/if}
 			{#if block.user_score != null}
 				<p class="score-note">Användarscore · original {block.climb_score ?? '—'}</p>
 			{/if}
@@ -232,6 +257,76 @@
 			{/if}
 		</div>
 	</section>
+
+	<section class="comments" aria-labelledby="comments-heading">
+		<h2 id="comments-heading">Kommentarer</h2>
+
+		{#if data.comments.length}
+			<ul class="comment-list">
+				{#each data.comments as comment (comment.id)}
+					<li class="comment">
+						<div class="comment-meta">
+							<span class="comment-author">{comment.display_name || 'Användare'}</span>
+							<time datetime={comment.created_at}
+								>{new Date(comment.created_at).toLocaleDateString('sv-SE', {
+									year: 'numeric',
+									month: 'short',
+									day: 'numeric'
+								})}</time
+							>
+						</div>
+						<p class="comment-body">{comment.body}</p>
+						{#if data.user?.id === comment.user_id && !data.usingSeedData}
+							<form method="POST" action="?/deleteComment" use:enhance class="comment-delete">
+								<input type="hidden" name="comment_id" value={comment.id} />
+								<button type="submit" class="linkish">Ta bort</button>
+							</form>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p class="dim">Inga kommentarer ännu.</p>
+		{/if}
+
+		{#if data.user && !data.usingSeedData}
+			<form
+				method="POST"
+				action="?/addComment"
+				use:enhance={({ formElement }) => {
+					return async ({ result, update }) => {
+						await update();
+						if (result.type === 'success') formElement.reset();
+					};
+				}}
+				class="comment-form"
+			>
+				<label>
+					Din kommentar
+					<textarea
+						name="body"
+						rows="3"
+						maxlength="2000"
+						required
+						placeholder="Dela tips om landning, access, betyg…"
+					></textarea>
+				</label>
+				<button type="submit" class="btn">Skicka</button>
+			</form>
+		{:else if !data.user}
+			<p class="dim"><a href="/auth">Logga in</a> för att kommentera.</p>
+		{/if}
+
+		{#if form?.commentError}
+			<p class="err">{form.commentError}</p>
+		{/if}
+		{#if form?.commentSaved}
+			<p class="ok">Kommentaren är publicerad.</p>
+		{/if}
+		{#if form?.commentDeleted}
+			<p class="ok">Kommentaren är borttagen.</p>
+		{/if}
+	</section>
 </main>
 
 <dialog
@@ -328,12 +423,55 @@
 		border-radius: 2px;
 	}
 
+	.badge.fav {
+		color: #7a4a00;
+		background: color-mix(in srgb, var(--amber) 28%, var(--chalk));
+		border-color: var(--amber);
+	}
+
+	.title-row {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		margin-top: 0.25rem;
+	}
+
+	.star-form {
+		margin: 0;
+		flex-shrink: 0;
+	}
+
+	.star {
+		width: 2.4rem;
+		height: 2.4rem;
+		padding: 0;
+		border: none;
+		background: transparent;
+		font-size: 1.6rem;
+		line-height: 1;
+		color: var(--muted);
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			transform 0.15s ease;
+	}
+
+	.star:hover {
+		color: var(--amber);
+		transform: scale(1.08);
+	}
+
+	.star.on {
+		color: var(--amber);
+	}
+
 	.developed-form {
 		margin: 0;
 	}
 
 	h1 {
-		margin: 0.25rem 0 0;
+		margin: 0;
+		flex: 1;
 		font-family: var(--font-display);
 		font-size: clamp(1.5rem, 3vw, 2rem);
 		letter-spacing: -0.02em;
@@ -613,6 +751,97 @@
 	.ok {
 		color: var(--moss-deep);
 		font-size: 0.9rem;
+	}
+
+	.comments {
+		margin-top: 2.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--line);
+	}
+
+	.comments h2 {
+		margin-top: 0;
+	}
+
+	.comment-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.comment {
+		padding: 0.85rem 1rem;
+		background: color-mix(in srgb, var(--panel) 92%, transparent);
+		border: 1px solid var(--line);
+		border-radius: 2px;
+	}
+
+	.comment-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.5rem 0.85rem;
+		margin-bottom: 0.35rem;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+
+	.comment-author {
+		font-weight: 700;
+		color: var(--ink);
+	}
+
+	.comment-body {
+		margin: 0;
+		line-height: 1.5;
+		font-size: 0.95rem;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.comment-delete {
+		margin: 0.5rem 0 0;
+	}
+
+	.linkish {
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--muted);
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.linkish:hover {
+		color: #8b2e2e;
+	}
+
+	.comment-form {
+		margin-top: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+	}
+
+	.comment-form textarea {
+		font: inherit;
+		font-size: 0.9rem;
+		text-transform: none;
+		letter-spacing: 0;
+		padding: 0.55rem 0.65rem;
+		border: 1px solid var(--line);
+		background: var(--chalk);
+		color: var(--ink);
+		border-radius: 2px;
+		resize: vertical;
+		min-height: 4.5rem;
 	}
 
 	@media (max-width: 720px) {

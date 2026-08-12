@@ -9,6 +9,8 @@
 		truncated?: boolean;
 		loading?: boolean;
 		usingSeedData?: boolean;
+		/** When true, render as sheet content (no absolute overlay chrome). */
+		embedded?: boolean;
 		onchange?: (filters: BlockFilters) => void;
 	};
 
@@ -19,6 +21,7 @@
 		truncated = false,
 		loading = false,
 		usingSeedData = false,
+		embedded = false,
 		onchange
 	}: Props = $props();
 
@@ -31,7 +34,7 @@
 	}
 </script>
 
-<aside class="panel">
+<aside class="panel" class:embedded>
 	<header>
 		<p class="brand">Stenkoll</p>
 		<p class="tagline">Flyttblock med klätterpotential</p>
@@ -125,6 +128,20 @@
 		</select>
 	</label>
 
+	{#if user}
+		<label class="check fav-filter">
+			<input
+				type="checkbox"
+				checked={filters.favoritesOnly}
+				onchange={(e) =>
+					onchange?.({ ...filters, favoritesOnly: e.currentTarget.checked })}
+			/>
+			Endast favoriter
+		</label>
+	{:else}
+		<p class="fav-hint"><a href="/auth">Logga in</a> för att spara favoriter</p>
+	{/if}
+
 	<p class="count">
 		{#if loading}
 			Laddar…
@@ -159,6 +176,21 @@
 		border: 1px solid var(--line);
 		box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
 		animation: slide-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.panel.embedded {
+		position: static;
+		top: auto;
+		left: auto;
+		width: 100%;
+		padding: 0;
+		background: transparent;
+		backdrop-filter: none;
+		border: none;
+		box-shadow: none;
+		animation: none;
+		max-height: none;
+		overflow: visible;
 	}
 
 	@keyframes slide-in {
@@ -242,6 +274,23 @@
 		cursor: pointer;
 	}
 
+	.fav-filter {
+		margin: 0.85rem 0 0;
+	}
+
+	.fav-hint {
+		margin: 0.85rem 0 0;
+		font-size: 0.8rem;
+		color: var(--muted);
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.fav-hint a {
+		color: var(--moss-deep);
+		font-weight: 600;
+	}
+
 	select {
 		font: inherit;
 		font-size: 0.9rem;
@@ -291,7 +340,7 @@
 	}
 
 	@media (max-width: 640px) {
-		.panel {
+		.panel:not(.embedded) {
 			top: auto;
 			bottom: 0;
 			left: 0;
