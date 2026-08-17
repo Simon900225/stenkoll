@@ -288,8 +288,8 @@
 			style: OPENFREEMAP_STYLE,
 			center: saved ? [saved.lng, saved.lat] : HALLANDSASEN_CENTER,
 			zoom: saved?.zoom ?? DEFAULT_ZOOM,
-			// OpenFreeMap vector tiles only go to z14; higher zooms return empty tiles.
-			maxZoom: 14,
+			// OpenFreeMap tiles max out at z14; MapLibre overzooms them past that.
+			maxZoom: 16,
 			attributionControl: { compact: true },
 			fadeDuration: 0
 		});
