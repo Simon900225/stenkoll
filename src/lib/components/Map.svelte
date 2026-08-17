@@ -6,13 +6,18 @@
 		NavigationControl,
 		GeolocateControl,
 		setWorkerUrl,
-		type MapMouseEvent
+		type FilterSpecification,
+		type GeoJSONSource,
+		type MapMouseEvent,
+		type SymbolLayerSpecification
 	} from 'maplibre-gl';
 	import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 	import 'maplibre-gl/dist/maplibre-gl.css';
+	import type { Feature, FeatureCollection, Point } from 'geojson';
 	import type { BlockMarker, MapBBox } from '$lib/types';
-	import { HALLANDSASEN_CENTER, DEFAULT_ZOOM, effectiveScore, scoreColor } from '$lib/blocks';
+	import { HALLANDSASEN_CENTER, DEFAULT_ZOOM } from '$lib/blocks';
 	import { loadMapView, saveMapView } from '$lib/mapView';
+	import { PIN_PIXEL_RATIO, pinIconId, pinStyleFromBlock, renderPinImage } from '$lib/pinIcon';
 
 	// MapLibre v6 + Vite: use ?worker&url so the shared chunk is bundled into the worker.
 	setWorkerUrl(maplibreWorkerUrl);
@@ -45,9 +50,26 @@
 
 	let container: HTMLDivElement | undefined = $state();
 	let map: MapLibreMap | undefined;
-	let markers: Marker[] = [];
 	let pickMarker: Marker | undefined;
 	let boundsTimer: ReturnType<typeof setTimeout> | undefined;
+
+	const SOURCE_BLOCKS = 'blocks';
+	const SOURCE_SELECTED = 'blocks-selected';
+	const LAYER_HIT = 'blocks-hit';
+	const LAYER_SELECTED_HIT = 'blocks-selected-hit';
+	const LAYER_PINS = 'blocks-pins';
+	const LAYER_SELECTED = 'blocks-selected-pin';
+	const PIN_LAYERS = [LAYER_HIT, LAYER_SELECTED_HIT, LAYER_PINS, LAYER_SELECTED];
+	const pinLayout: SymbolLayerSpecification['layout'] = {
+		'icon-image': ['get', 'icon'],
+		'icon-anchor': 'bottom',
+		'icon-allow-overlap': true,
+		'icon-ignore-placement': true,
+		'icon-overlap': 'always',
+		'symbol-z-order': 'viewport-y'
+	};
+
+	const EMPTY: FeatureCollection<Point> = { type: 'FeatureCollection', features: [] };
 
 	const refs: {
 		pickMode: boolean;
@@ -92,11 +114,6 @@
 		refs.picked = picked;
 	});
 
-	function clearMarkers() {
-		for (const m of markers) m.remove();
-		markers = [];
-	}
-
 	function clearPickMarker() {
 		pickMarker?.remove();
 		pickMarker = undefined;
@@ -121,39 +138,123 @@
 		}
 	}
 
-	function renderMarkers() {
-		if (!map) return;
-		clearMarkers();
-		for (const block of refs.blocks) {
-			const el = document.createElement('button');
-			el.type = 'button';
-			el.className = 'boulder-marker';
-			el.setAttribute('aria-label', block.name);
-			const score = effectiveScore(block);
-			el.style.setProperty('--marker-color', scoreColor(score));
-			el.dataset.selected = refs.selectedId === block.id ? 'true' : 'false';
-			el.dataset.source = block.source;
-			if (block.user_score != null) el.dataset.userScore = 'true';
-			if (block.developed) el.dataset.developed = 'true';
-			if (block.has_photo) el.dataset.hasPhoto = 'true';
-			// Inner visual so scale transitions never fight MapLibre's position transform.
-			el.innerHTML = `<span class="boulder-marker-visual">${score ?? '?'}</span>`;
-			el.addEventListener('click', (e) => {
-				e.stopPropagation();
-				refs.onselect?.(block);
-			});
+	function toFeature(block: BlockMarker): Feature<Point> {
+		const style = pinStyleFromBlock(block);
+		return {
+			type: 'Feature',
+			properties: { id: block.id, icon: pinIconId(style) },
+			geometry: { type: 'Point', coordinates: [block.lng, block.lat] }
+		};
+	}
 
-			const marker = new Marker({ element: el, anchor: 'bottom' })
-				.setLngLat([block.lng, block.lat])
-				.addTo(map);
-			markers.push(marker);
+	function toCollection(list: BlockMarker[]): FeatureCollection<Point> {
+		return { type: 'FeatureCollection', features: list.map(toFeature) };
+	}
+
+	function ensurePinImages(list: BlockMarker[]) {
+		if (!map) return;
+		for (const block of list) {
+			const style = pinStyleFromBlock(block);
+			const id = pinIconId(style);
+			if (map.hasImage(id)) continue;
+			map.addImage(id, renderPinImage(style), { pixelRatio: PIN_PIXEL_RATIO });
 		}
+	}
+
+	function source(id: string): GeoJSONSource | undefined {
+		return map?.getSource(id) as GeoJSONSource | undefined;
+	}
+
+	function syncBlockData() {
+		if (!map?.getSource(SOURCE_BLOCKS)) return;
+		ensurePinImages(refs.blocks);
+		source(SOURCE_BLOCKS)?.setData(toCollection(refs.blocks));
+		syncSelected();
+	}
+
+	function syncSelected() {
+		if (!map?.getSource(SOURCE_SELECTED)) return;
+		const selected = refs.selectedId
+			? refs.blocks.find((b) => b.id === refs.selectedId)
+			: undefined;
+		if (selected) ensurePinImages([selected]);
+		source(SOURCE_SELECTED)?.setData(
+			selected ? { type: 'FeatureCollection', features: [toFeature(selected)] } : EMPTY
+		);
+		const hideSelected: FilterSpecification | null = refs.selectedId
+			? ['!=', ['get', 'id'], refs.selectedId]
+			: null;
+		if (map.getLayer(LAYER_PINS)) map.setFilter(LAYER_PINS, hideSelected);
+		if (map.getLayer(LAYER_HIT)) map.setFilter(LAYER_HIT, hideSelected);
+	}
+
+	function addPinLayers() {
+		if (!map || map.getSource(SOURCE_BLOCKS)) return;
+
+		map.addSource(SOURCE_BLOCKS, { type: 'geojson', data: EMPTY });
+		map.addSource(SOURCE_SELECTED, { type: 'geojson', data: EMPTY });
+
+		const hitPaint = {
+			'circle-radius': 18,
+			'circle-opacity': 0,
+			'circle-translate': [0, -12] as [number, number],
+			'circle-translate-anchor': 'viewport' as const
+		};
+
+		map.addLayer({
+			id: LAYER_HIT,
+			type: 'circle',
+			source: SOURCE_BLOCKS,
+			paint: hitPaint
+		});
+
+		map.addLayer({
+			id: LAYER_SELECTED_HIT,
+			type: 'circle',
+			source: SOURCE_SELECTED,
+			paint: { ...hitPaint, 'circle-radius': 22 }
+		});
+
+		map.addLayer({
+			id: LAYER_PINS,
+			type: 'symbol',
+			source: SOURCE_BLOCKS,
+			layout: pinLayout
+		});
+
+		map.addLayer({
+			id: LAYER_SELECTED,
+			type: 'symbol',
+			source: SOURCE_SELECTED,
+			layout: {
+				...pinLayout,
+				'icon-size': 1.25
+			}
+		});
+	}
+
+	function blockAtPoint(point: { x: number; y: number }): BlockMarker | undefined {
+		if (!map) return;
+		const layers = PIN_LAYERS.filter((id) => map!.getLayer(id));
+		if (!layers.length) return;
+		const id = map.queryRenderedFeatures([point.x, point.y], { layers })[0]?.properties?.id;
+		if (typeof id !== 'string') return;
+		return refs.blocks.find((b) => b.id === id);
+	}
+
+	function setPointerCursor(on: boolean) {
+		if (!map || refs.pickMode) return;
+		map.getCanvas().style.cursor = on ? 'pointer' : '';
 	}
 
 	$effect(() => {
 		blocks;
+		if (map?.isStyleLoaded()) syncBlockData();
+	});
+
+	$effect(() => {
 		selectedId;
-		if (map) renderMarkers();
+		if (map?.isStyleLoaded()) syncSelected();
 	});
 
 	$effect(() => {
@@ -189,7 +290,8 @@
 			zoom: saved?.zoom ?? DEFAULT_ZOOM,
 			// OpenFreeMap vector tiles only go to z14; higher zooms return empty tiles.
 			maxZoom: 14,
-			attributionControl: { compact: true }
+			attributionControl: { compact: true },
+			fadeDuration: 0
 		});
 
 		map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -199,9 +301,13 @@
 		});
 		map.addControl(geolocate, 'top-right');
 
-		map.on('load', () => {
-			renderMarkers();
+		map.on('style.load', () => {
+			addPinLayers();
+			syncBlockData();
 			renderPickMarker(refs.picked);
+		});
+
+		map.on('load', () => {
 			emitBounds();
 			// First visit only: try to center on the user (permission may be denied).
 			if (rememberViewport && !saved) {
@@ -226,16 +332,33 @@
 				const loc = { lng: e.lngLat.lng, lat: e.lngLat.lat };
 				renderPickMarker(loc);
 				refs.onpick?.(loc);
+				return;
 			}
+			const block = blockAtPoint(e.point);
+			if (block) refs.onselect?.(block);
+		});
+
+		map.on('mousemove', (e: MapMouseEvent) => {
+			setPointerCursor(Boolean(blockAtPoint(e.point)));
+		});
+
+		let cancelled = false;
+		const fontsReady = document.fonts?.ready.then(() => {
+			if (cancelled || !map?.isStyleLoaded()) return;
+			for (const id of map.listImages()) {
+				if (id.startsWith('pin:')) map.removeImage(id);
+			}
+			syncBlockData();
 		});
 
 		const ro = new ResizeObserver(() => map?.resize());
 		ro.observe(container);
 
 		return () => {
+			cancelled = true;
 			clearTimeout(boundsTimer);
 			ro.disconnect();
-			clearMarkers();
+			void fontsReady;
 			clearPickMarker();
 			map?.remove();
 			map = undefined;
@@ -301,7 +424,6 @@
 		background: transparent;
 		cursor: pointer;
 		filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.35));
-		transition: filter 0.2s ease;
 	}
 
 	.map-wrap :global(.boulder-marker-visual) {
@@ -318,7 +440,6 @@
 		line-height: 1.1;
 		color: #1a1f18;
 		transform-origin: bottom center;
-		transition: transform 0.2s ease;
 	}
 
 	.map-wrap :global(.boulder-marker-visual::before) {
@@ -329,63 +450,6 @@
 		clip-path: polygon(50% 100%, 0 0, 100% 0);
 		border-radius: 2px 2px 0 0;
 		z-index: -1;
-	}
-
-	.map-wrap :global(.boulder-marker[data-selected='true']) {
-		filter: drop-shadow(0 3px 6px rgb(0 0 0 / 0.45));
-		z-index: 2;
-	}
-
-	.map-wrap :global(.boulder-marker[data-selected='true'] .boulder-marker-visual) {
-		transform: scale(1.25);
-	}
-
-	.map-wrap :global(.boulder-marker[data-source='user'] .boulder-marker-visual::after) {
-		content: '';
-		position: absolute;
-		top: 2px;
-		right: 4px;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--chalk);
-		border: 1px solid var(--ink);
-	}
-
-	/* Border rings: blue = has photo (not developed), green = developed. */
-	.map-wrap :global(.boulder-marker[data-has-photo='true']:not([data-developed='true'])::before) {
-		content: '';
-		position: absolute;
-		inset: 0 0 4px;
-		background: #2563eb;
-		clip-path: polygon(50% 100%, 0 0, 100% 0);
-		border-radius: 2px 2px 0 0;
-		pointer-events: none;
-	}
-
-	.map-wrap :global(.boulder-marker[data-developed='true']::before) {
-		content: '';
-		position: absolute;
-		inset: 0 0 4px;
-		background: #2f9e44;
-		clip-path: polygon(50% 100%, 0 0, 100% 0);
-		border-radius: 2px 2px 0 0;
-		pointer-events: none;
-	}
-
-	.map-wrap :global(.boulder-marker[data-has-photo='true'] .boulder-marker-visual),
-	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual) {
-		position: relative;
-		z-index: 1;
-	}
-
-	.map-wrap :global(.boulder-marker[data-has-photo='true'] .boulder-marker-visual::before),
-	.map-wrap :global(.boulder-marker[data-developed='true'] .boulder-marker-visual::before) {
-		inset: 2px 4px 8px;
-	}
-
-	.map-wrap :global(.boulder-marker:hover .boulder-marker-visual) {
-		transform: scale(1.12);
 	}
 
 	.map-wrap :global(.pick-marker) {
