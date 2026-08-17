@@ -311,6 +311,7 @@
 		width: 100vw;
 		height: 100dvh;
 		overflow: hidden;
+		overscroll-behavior: none;
 	}
 
 	.brand-mark {

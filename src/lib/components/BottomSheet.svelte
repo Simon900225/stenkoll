@@ -223,9 +223,17 @@
 	}
 
 	function onTouchMove(e: TouchEvent) {
-		if (dragStarted || isDragging) {
-			handleDragMove(e.touches[0].clientY);
-			if (isDragging) e.preventDefault();
+		if (!dragStarted && !isDragging) return;
+
+		const clientY = e.touches[0].clientY;
+		handleDragMove(clientY);
+
+		const atTop = !contentElement || contentElement.scrollTop <= 0;
+		const pullingDown = clientY > startY;
+		// Prevent pull-to-refresh as soon as a downward drag starts — waiting
+		// for the 10px sheet threshold is too late for Chrome/Safari.
+		if (isDragging || (atTop && pullingDown)) {
+			e.preventDefault();
 		}
 	}
 
@@ -374,7 +382,8 @@
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
-		touch-action: pan-y;
+		touch-action: none;
+		overscroll-behavior: none;
 		cursor: grab;
 	}
 
@@ -447,6 +456,8 @@
 		flex: 1;
 		-webkit-overflow-scrolling: touch;
 		padding: 0 1.1rem 1.25rem;
+		touch-action: pan-y;
+		overscroll-behavior-y: contain;
 	}
 
 	.pane-content :global(button),
