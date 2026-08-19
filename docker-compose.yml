@@ -52,6 +52,7 @@ services:
       MATOMO_DATABASE_DBNAME: matomo
     volumes:
       - matomo_html:/var/www/html
+      - ./matomo/common.config.ini.php:/var/www/html/config/common.config.ini.php:ro
 
   matomo-cron:
     image: matomo:5

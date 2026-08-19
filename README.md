@@ -72,7 +72,7 @@ Valfritt i `docker-compose.yml`: sätt `ORIGIN=https://din-domän.se` om proxyn 
 Analytics körs self-hostat i samma Compose-fil (MariaDB + Matomo på **3251** + cron för rapportarkivering). Trackern är cookieless och respekterar Do Not Track. Klientnavigering i SvelteKit räknas som egna sidvisningar.
 
 1. Sätt `MATOMO_DB_ROOT_PASSWORD` och `MATOMO_DB_PASSWORD` i `.env` (krav för `docker compose up`).
-2. Proxy:a Matomo bakom HTTPS, t.ex. `matomo.din-domän.se` → `http://127.0.0.1:3251`:
+2. Proxy:a Matomo bakom HTTPS, t.ex. `matomo.din-domän.se` → `http://127.0.0.1:3251`. `Host` måste vara det publika namnet (inte `127.0.0.1:3251`):
 
 ```
 proxy_set_header Host $host;
@@ -80,6 +80,8 @@ proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
+
+`matomo/common.config.ini.php` får Matomo att lita på de headers (annars failar installern med invalid Referer). Recreate: `docker compose up -d matomo`.
 
 3. Öppna den publika Matomo-URL:en och kör installationsguiden. Databas: host `matomo-db`, user/databas `matomo`, lösenord = `MATOMO_DB_PASSWORD`.
 4. Skapa webbplatsen (Stenkoll). Första sajten får vanligtvis site ID `1`.
