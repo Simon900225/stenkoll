@@ -18,7 +18,9 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href={favicon} type="image/svg+xml" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+	<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2f4a34" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
