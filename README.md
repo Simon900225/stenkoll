@@ -67,6 +67,27 @@ I Supabase Dashboard → Authentication → URL Configuration: lägg till din pu
 
 Valfritt i `docker-compose.yml`: sätt `ORIGIN=https://din-domän.se` om proxyn inte skickar headers korrekt.
 
+### Matomo
+
+Analytics körs self-hostat i samma Compose-fil (MariaDB + Matomo på **3251** + cron för rapportarkivering). Trackern är cookieless och respekterar Do Not Track. Klientnavigering i SvelteKit räknas som egna sidvisningar.
+
+1. Sätt `MATOMO_DB_ROOT_PASSWORD` och `MATOMO_DB_PASSWORD` i `.env` (krav för `docker compose up`).
+2. Proxy:a Matomo bakom HTTPS, t.ex. `matomo.din-domän.se` → `http://127.0.0.1:3251`:
+
+```
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+```
+
+3. Öppna den publika Matomo-URL:en och kör installationsguiden. Databas: host `matomo-db`, user/databas `matomo`, lösenord = `MATOMO_DB_PASSWORD`.
+4. Skapa webbplatsen (Stenkoll). Första sajten får vanligtvis site ID `1`.
+5. Sätt `PUBLIC_MATOMO_URL` till samma publika origin (utan trailing slash) och `PUBLIC_MATOMO_SITE_ID`.
+6. I Matomo: Administration → System → General settings: tvinga HTTPS om du kör bakom TLS, och slå på IP-anonymisering under Privacy.
+
+`npm run dev` skickar inga träffar om du inte sätter `PUBLIC_MATOMO_TRACK_DEV=true`.
+
 ### Supabase
 
 ```bash

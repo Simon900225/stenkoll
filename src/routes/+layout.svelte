@@ -1,10 +1,17 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
-	import { invalidate } from '$app/navigation';
+	import { afterNavigate, invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { initMatomo, trackMatomoPage } from '$lib/matomo';
 	import '../app.css';
 
 	let { children, data } = $props();
+
+	afterNavigate(({ to, from }) => {
+		initMatomo();
+		if (!to) return;
+		trackMatomoPage(to.url.href, document.title, from?.url.href);
+	});
 
 	onMount(() => {
 		if (!data.supabase) return;
