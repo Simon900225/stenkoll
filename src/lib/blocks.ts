@@ -182,8 +182,7 @@ export function wgs84ToSweref99tm(latDeg: number, lngDeg: number): { e: number; 
 
 export function defaultFilters(): BlockFilters {
 	return {
-		// 0 = include unscored imports (climb_score null treated as 0)
-		minScore: 0,
+		minScore: 3,
 		minHeight: 0,
 		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],

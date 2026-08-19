@@ -29,7 +29,7 @@ function parsePhotoFilter(raw: string | null): BlockFilters['photoFilter'] {
 }
 
 export function filtersFromSearchParams(params: URLSearchParams): BlockFilters {
-	const minScore = Number(params.get('minScore') ?? '0');
+	const minScore = Number(params.get('minScore') ?? '3');
 	const minHeight = Number(params.get('minHeight') ?? '0');
 	const minArea = Number(params.get('minArea') ?? '0');
 	const favoritesOnly =
