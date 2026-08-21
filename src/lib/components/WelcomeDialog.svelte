@@ -1,87 +1,143 @@
 <script lang="ts">
-	const STORAGE_KEY = 'stenkoll-welcome-v1';
+	const WELCOME_KEY = 'stenkoll-welcome-v1';
+	const NOTICE_KEY = 'stenkoll-heritage-notice-v1';
 
 	let dialogEl: HTMLDialogElement | undefined;
+	let step = $state<1 | 2>(1);
 
-	function persistSeen() {
+	function persist(key: string) {
 		try {
-			localStorage.setItem(STORAGE_KEY, '1');
+			localStorage.setItem(key, '1');
 		} catch {
 			// private mode / quota
 		}
 	}
 
-	function shouldAutoOpen() {
+	function hasSeen(key: string) {
 		try {
-			return localStorage.getItem(STORAGE_KEY) !== '1';
+			return localStorage.getItem(key) === '1';
 		} catch {
-			return true;
+			return false;
 		}
+	}
+
+	function initialStep(): 1 | 2 {
+		return hasSeen(WELCOME_KEY) && !hasSeen(NOTICE_KEY) ? 2 : 1;
+	}
+
+	function shouldAutoOpen() {
+		return !hasSeen(WELCOME_KEY) || !hasSeen(NOTICE_KEY);
 	}
 
 	function attachDialog(node: HTMLDialogElement) {
 		dialogEl = node;
-		if (shouldAutoOpen()) node.showModal();
+		if (shouldAutoOpen()) {
+			step = initialStep();
+			node.showModal();
+		}
 		return () => {
 			dialogEl = undefined;
 		};
 	}
 
 	export function show() {
+		step = 1;
 		dialogEl?.showModal();
 	}
 
-	function dismiss() {
-		persistSeen();
+	function goToReminder() {
+		persist(WELCOME_KEY);
+		step = 2;
+		requestAnimationFrame(() => {
+			dialogEl?.scrollTo({ top: 0 });
+			document.getElementById('notice-title')?.focus();
+		});
+	}
+
+	function acknowledge() {
+		persist(WELCOME_KEY);
+		persist(NOTICE_KEY);
 		dialogEl?.close();
 	}
 
 	function onNativeClose() {
-		persistSeen();
+		persist(WELCOME_KEY);
+		persist(NOTICE_KEY);
+	}
+
+	function onCancel(event: Event) {
+		if (step === 1) {
+			event.preventDefault();
+			goToReminder();
+		}
 	}
 
 	function onBackdropClick(event: MouseEvent) {
-		if (event.target === dialogEl) dismiss();
+		if (event.target !== dialogEl) return;
+		if (step === 1) goToReminder();
+		else acknowledge();
+	}
+
+	function onCloseClick() {
+		if (step === 1) goToReminder();
+		else acknowledge();
 	}
 </script>
 
 <dialog
 	{@attach attachDialog}
 	class="welcome"
-	aria-labelledby="welcome-title"
-	aria-describedby="welcome-desc"
+	aria-labelledby={step === 1 ? 'welcome-title' : 'notice-title'}
+	aria-describedby={step === 1 ? 'welcome-desc' : 'notice-desc care-desc'}
 	onclose={onNativeClose}
+	oncancel={onCancel}
 	onclick={onBackdropClick}
 >
-	<button type="button" class="close" onclick={dismiss} aria-label="Stäng">×</button>
+	<button type="button" class="close" onclick={onCloseClick} aria-label="Stäng">×</button>
 
-	<p class="kicker">Stenkoll</p>
-	<h2 id="welcome-title">Hitta flyttblock med klätterpotential</h2>
-	<p id="welcome-desc" class="lead">
-		Kartan samlar poängsatta block från Fornsök och andra klättrare. Så här kommer du igång:
-	</p>
+	{#if step === 1}
+		<p class="kicker">Stenkoll</p>
+		<h2 id="welcome-title">Hitta flyttblock med klätterpotential</h2>
+		<p id="welcome-desc" class="lead">
+			Kartan samlar poängsatta block från Fornsök och andra klättrare. Så här kommer du igång:
+		</p>
 
-	<ol>
-		<li>
-			<strong>Kartan</strong>
-			— panorera och zooma. Markörer visas för blocken i vyn. GPS-knappen tar dig till din plats.
-		</li>
-		<li>
-			<strong>Ett block</strong>
-			— tryck på en markör för score, storlek och länkar till kartor. Öppna blocket för foton och
-			kommentarer.
-		</li>
-		<li>
-			<strong>Filter</strong>
-			— begränsa på score, höjd, yta, källa (Fornsök / användare) och om det finns bild.
-		</li>
-	</ol>
+		<ol>
+			<li>
+				<strong>Kartan</strong>
+				— panorera och zooma. Markörer visas för blocken i vyn. GPS-knappen tar dig till din plats.
+			</li>
+			<li>
+				<strong>Ett block</strong>
+				— tryck på en markör för score, storlek och länkar till kartor. Öppna blocket för foton och
+				kommentarer.
+			</li>
+			<li>
+				<strong>Filter</strong>
+				— begränsa på score, höjd, yta, källa (Fornsök / användare) och om det finns bild.
+			</li>
+		</ol>
 
-	<p class="account">
-		Med konto kan du spara favoriter, lägga till egna block och foton, och kommentera.
-	</p>
+		<p class="account">
+			Med konto kan du spara favoriter, lägga till egna block och foton, och kommentera.
+		</p>
 
-	<button type="button" class="go" onclick={dismiss}>Kom igång</button>
+		<button type="button" class="go" onclick={goToReminder}>Kom igång</button>
+	{:else}
+		<p class="kicker">Fornlämningar</p>
+		<h2 id="notice-title" tabindex="-1">En vänlig påminnelse</h2>
+		<p id="notice-desc" class="notice">
+			Det är enligt lagen förbjudet att utan tillstånd från Länsstyrelsen rubba, ta bort, gräva ut,
+			täcka över eller skada en fornlämning. Var därför mycket aktsam vid eventuell utveckling av
+			block och ta vid behov kontakt med Länsstyrelsen vid osäkerheter.
+		</p>
+
+		<p id="care-desc" class="care">
+			Visa hänsyn i naturen. Gör ingen onödig åverkan och begränsa din påverkan på omgivningen.
+		</p>
+
+		<button type="button" class="go" onclick={acknowledge}>Jag förstår</button>
+	{/if}
 </dialog>
 
 <style>
@@ -152,6 +208,10 @@
 		line-height: 1.2;
 	}
 
+	h2:focus {
+		outline: none;
+	}
+
 	.lead {
 		margin: 0.65rem 0 0;
 		font-size: 0.92rem;
@@ -182,6 +242,25 @@
 		line-height: 1.4;
 		color: var(--ink);
 		background: color-mix(in srgb, var(--moss) 14%, transparent);
+		border-left: 2px solid var(--moss);
+	}
+
+	.notice,
+	.care {
+		margin: 0.85rem 0 0;
+		padding: 0.7rem 0.75rem;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: var(--ink);
+	}
+
+	.notice {
+		background: color-mix(in srgb, var(--amber) 16%, transparent);
+		border-left: 2px solid var(--amber);
+	}
+
+	.care {
+		background: color-mix(in srgb, var(--moss) 16%, transparent);
 		border-left: 2px solid var(--moss);
 	}
 
