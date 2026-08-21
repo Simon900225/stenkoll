@@ -5,6 +5,7 @@
 	import BlockPanel from '$lib/components/BlockPanel.svelte';
 	import BottomSheet from '$lib/components/BottomSheet.svelte';
 	import WelcomeDialog from '$lib/components/WelcomeDialog.svelte';
+	import TitleBar from '$lib/components/TitleBar.svelte';
 	import { defaultFilters, matchesFilters } from '$lib/blocks';
 	import type { Block, BlockFilters, BlockMarker, MapBBox } from '$lib/types';
 
@@ -232,207 +233,123 @@
 </svelte:head>
 
 <main class="app">
-	<Map
-		blocks={markers}
-		selectedId={selected?.id ?? null}
-		rememberViewport
-		onselect={selectMarker}
-		onbounds={(b) => (bounds = b)}
+	<TitleBar
+		onhelp={() => welcome?.show()}
+		status={loading ? 'Laddar…' : `${markers.length} st block i vyn`}
+		statusHint={truncated ? 'max — zooma in' : null}
 	/>
 
-	<div class="brand-mark">
-		<div class="brand-row">
-			<h1>Stenkoll</h1>
-			<button
-				type="button"
-				class="help"
-				onclick={() => welcome?.show()}
-				aria-label="Så här fungerar Stenkoll"
-				title="Så här fungerar Stenkoll"
+	<div class="stage">
+		<Map
+			blocks={markers}
+			selectedId={selected?.id ?? null}
+			rememberViewport
+			onselect={selectMarker}
+			onbounds={(b) => (bounds = b)}
+		/>
+
+		<WelcomeDialog bind:this={welcome} />
+
+		{#if isMobile}
+			<BottomSheet
+				bind:this={sheet}
+				backdrop={Boolean(selected)}
+				backdropOpacity={0.25}
+				initialBreak="middle"
+				breaks={sheetBreaks}
+				bottomClose={false}
+				closable={Boolean(selected)}
+				autoPresent
+				events={{
+					onClose: closeSelection,
+					onBackdropTap: closeSelection
+				}}
 			>
-				?
-			</button>
-		</div>
-		{#if !isMobile}
-			<p>
-				{#if loading}
-					Laddar…
-				{:else}
-					{markers.length} st block i vyn
-					{#if truncated}
-						<span>(max — zooma in)</span>
+				{#snippet peek()}
+					{#if selected}
+						<div class="block-peek">
+							<strong>{selected.name}</strong>
+							{#if selected.height_m != null}
+								<span>{selected.height_m} m</span>
+							{/if}
+						</div>
+					{:else}
+						<FilterPanel
+							compact
+							{filters}
+							lists={data.lists ?? []}
+							blockCount={markers.length}
+							{truncated}
+							{loading}
+						/>
 					{/if}
-				{/if}
-			</p>
-		{/if}
-	</div>
-
-	<WelcomeDialog bind:this={welcome} />
-
-	{#if isMobile}
-		<BottomSheet
-			bind:this={sheet}
-			backdrop={Boolean(selected)}
-			backdropOpacity={0.25}
-			initialBreak="middle"
-			breaks={sheetBreaks}
-			bottomClose={false}
-			closable={Boolean(selected)}
-			autoPresent
-			events={{
-				onClose: closeSelection,
-				onBackdropTap: closeSelection
-			}}
-		>
-			{#snippet peek()}
+				{/snippet}
 				{#if selected}
-					<div class="block-peek">
-						<strong>{selected.name}</strong>
-						{#if selected.height_m != null}
-							<span>{selected.height_m} m</span>
-						{/if}
-					</div>
+					<BlockPanel
+						block={selected}
+						listName={listNameForSelected}
+						embedded
+						favorited={favoriteIds.has(selected.id)}
+						canFavorite={Boolean(data.user) && !data.usingSeedData}
+						favoriteBusy={favoriteBusy}
+						onfavorite={() => {
+							void toggleFavorite(selected!.id);
+						}}
+						onclose={closeSelection}
+					/>
 				{:else}
 					<FilterPanel
-						compact
+						embedded
 						{filters}
 						lists={data.lists ?? []}
-						blockCount={markers.length}
-						{truncated}
-						{loading}
+						user={data.user}
+						usingSeedData={data.usingSeedData}
+						onchange={(f) => {
+							filters = f;
+						}}
 					/>
 				{/if}
-			{/snippet}
-			{#if selected}
-				<BlockPanel
-					block={selected}
-					listName={listNameForSelected}
-					embedded
-					favorited={favoriteIds.has(selected.id)}
-					canFavorite={Boolean(data.user) && !data.usingSeedData}
-					favoriteBusy={favoriteBusy}
-					onfavorite={() => {
-						void toggleFavorite(selected!.id);
-					}}
-					onclose={closeSelection}
-				/>
-			{:else}
-				<FilterPanel
-					embedded
-					{filters}
-					lists={data.lists ?? []}
-					user={data.user}
-					usingSeedData={data.usingSeedData}
-					onchange={(f) => {
-						filters = f;
-					}}
-				/>
-			{/if}
-		</BottomSheet>
-	{:else}
-		<FilterPanel
-			{filters}
-			lists={data.lists ?? []}
-			user={data.user}
-			usingSeedData={data.usingSeedData}
-			onchange={(f) => {
-				filters = f;
-			}}
-		/>
+			</BottomSheet>
+		{:else}
+			<FilterPanel
+				{filters}
+				lists={data.lists ?? []}
+				user={data.user}
+				usingSeedData={data.usingSeedData}
+				onchange={(f) => {
+					filters = f;
+				}}
+			/>
 
-		<BlockPanel
-			block={selected}
-			listName={listNameForSelected}
-			favorited={selected ? favoriteIds.has(selected.id) : false}
-			canFavorite={Boolean(data.user) && !data.usingSeedData}
-			favoriteBusy={favoriteBusy}
-			onfavorite={() => {
-				if (selected) void toggleFavorite(selected.id);
-			}}
-			onclose={closeSelection}
-		/>
-	{/if}
+			<BlockPanel
+				block={selected}
+				listName={listNameForSelected}
+				favorited={selected ? favoriteIds.has(selected.id) : false}
+				canFavorite={Boolean(data.user) && !data.usingSeedData}
+				favoriteBusy={favoriteBusy}
+				onfavorite={() => {
+					if (selected) void toggleFavorite(selected.id);
+				}}
+				onclose={closeSelection}
+			/>
+		{/if}
+	</div>
 </main>
 
 <style>
 	.app {
-		position: relative;
+		display: flex;
+		flex-direction: column;
 		width: 100vw;
 		height: 100dvh;
 		overflow: hidden;
 		overscroll-behavior: none;
 	}
 
-	.brand-mark {
-		position: absolute;
-		top: max(0.7rem, env(safe-area-inset-top));
-		left: max(0.9rem, env(safe-area-inset-left));
-		z-index: 4;
-		margin: 0;
-		padding: 0.28rem 0.6rem 0.32rem;
-		background: color-mix(in srgb, var(--panel) 10%, transparent);
-		backdrop-filter: blur(8px);
-		border-radius: 4px;
-		pointer-events: none;
-	}
-
-	.brand-row {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
-
-	.brand-mark h1 {
-		margin: 0;
-		font-family: var(--font-display);
-		font-size: 1.4rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		line-height: 1.1;
-		color: var(--ink);
-	}
-
-	.help {
-		pointer-events: auto;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.35rem;
-		height: 1.35rem;
-		padding: 0;
-		border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
-		background: color-mix(in srgb, var(--panel) 55%, transparent);
-		border-radius: 999px;
-		font-family: var(--font-display);
-		font-size: 0.78rem;
-		font-weight: 700;
-		line-height: 1;
-		color: var(--ink);
-		cursor: pointer;
-	}
-
-	.help:hover,
-	.help:focus-visible {
-		border-color: var(--moss-deep);
-		background: var(--panel);
-		outline: none;
-	}
-
-	.brand-mark p {
-		margin: 0.15rem 0 0;
-		font-family: var(--font-display);
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--ink);
-	}
-
-	.brand-mark span {
-		display: block;
-		margin-top: 0.1rem;
-		font-family: var(--font-body);
-		font-size: 0.7rem;
-		font-weight: 500;
-		color: var(--amber, #c4783a);
+	.stage {
+		position: relative;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.block-peek {

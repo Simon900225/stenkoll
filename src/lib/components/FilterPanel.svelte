@@ -257,7 +257,7 @@
 <style>
 	.panel {
 		position: absolute;
-		top: 4.5rem;
+		top: 1rem;
 		left: 1rem;
 		z-index: 5;
 		width: min(300px, calc(100vw - 2rem));
