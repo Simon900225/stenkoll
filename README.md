@@ -81,7 +81,7 @@ proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
 
-`matomo/common.config.ini.php` får Matomo att lita på de headers (annars failar installern med invalid Referer). Recreate: `docker compose up -d matomo`.
+`matomo/common.config.ini.php` får Matomo att lita på de headers (annars failar installern med invalid Referer). `PUBLIC_MATOMO_URL` skrivs in som `trusted_hosts` vid start (annars varnar Matomo att den är konfigurerad för `127.0.0.1:3251`). Recreate: `docker compose up -d matomo`.
 
 3. Öppna den publika Matomo-URL:en och kör installationsguiden. Databas: host `matomo-db`, user/databas `matomo`, lösenord = `MATOMO_DB_PASSWORD`.
 4. Skapa webbplatsen (Stenkoll). Första sajten får vanligtvis site ID `1`.

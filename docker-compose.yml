@@ -50,9 +50,13 @@ services:
       MATOMO_DATABASE_USERNAME: matomo
       MATOMO_DATABASE_PASSWORD: ${MATOMO_DB_PASSWORD:?Set MATOMO_DB_PASSWORD in .env}
       MATOMO_DATABASE_DBNAME: matomo
+      PUBLIC_MATOMO_URL: ${PUBLIC_MATOMO_URL:-}
+      MATOMO_PUBLIC_HOST: ${MATOMO_PUBLIC_HOST:-}
     volumes:
       - matomo_html:/var/www/html
       - ./matomo/common.config.ini.php:/var/www/html/config/common.config.ini.php:ro
+      - ./matomo/start.sh:/matomo-start.sh:ro
+    command: ["/bin/sh", "/matomo-start.sh"]
 
   matomo-cron:
     image: matomo:5
