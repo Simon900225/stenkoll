@@ -16,6 +16,13 @@ export type FavoriteBlock = {
 	favoritedAt: string;
 };
 
+export type ProfileList = {
+	id: string;
+	name: string;
+	pinCount: number;
+	createdAt: string;
+};
+
 export const load: PageServerLoad = async ({ parent, cookies }) => {
 	const { user, usingSeedData } = await parent();
 	if (!user) throw redirect(303, '/auth');
@@ -25,6 +32,7 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 			profile: { display_name: null as string | null },
 			blocks: [] as ProfileBlock[],
 			favorites: [] as FavoriteBlock[],
+			lists: [] as ProfileList[],
 			usingSeedData: true
 		};
 	}
@@ -37,7 +45,12 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 		.eq('id', user.id)
 		.maybeSingle();
 
-	const [{ data: photoRows }, { data: scoredRows }, { data: favoriteRows }] = await Promise.all([
+	const [
+		{ data: photoRows },
+		{ data: scoredRows },
+		{ data: favoriteRows },
+		{ data: listRows }
+	] = await Promise.all([
 		supabase.from('photos').select('block_id').eq('user_id', user.id),
 		supabase
 			.from('blocks')
@@ -47,6 +60,11 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 			.from('favorites')
 			.select('block_id, created_at')
 			.eq('user_id', user.id)
+			.order('created_at', { ascending: false }),
+		supabase
+			.from('block_lists')
+			.select('id, name, created_at')
+			.eq('created_by', user.id)
 			.order('created_at', { ascending: false })
 	]);
 
@@ -112,10 +130,27 @@ export const load: PageServerLoad = async ({ parent, cookies }) => {
 			}));
 	}
 
+	const lists: ProfileList[] = await Promise.all(
+		(listRows ?? []).map(async (row) => {
+			const { count } = await supabase
+				.from('blocks')
+				.select('id', { count: 'exact', head: true })
+				.eq('list_id', row.id)
+				.eq('source', 'list');
+			return {
+				id: row.id,
+				name: row.name,
+				pinCount: count ?? 0,
+				createdAt: row.created_at
+			};
+		})
+	);
+
 	return {
 		profile: { display_name: profile?.display_name ?? null },
 		blocks,
 		favorites,
+		lists,
 		usingSeedData: usingSeedData ?? false
 	};
 };
@@ -155,5 +190,30 @@ export const actions: Actions = {
 		const supabase = createSupabaseServerClient(cookies);
 		await supabase.auth.signOut();
 		throw redirect(303, '/');
+	},
+
+	deleteList: async ({ request, cookies }) => {
+		if (!isSupabaseConfigured()) {
+			return fail(400, { listError: 'Supabase är inte konfigurerat.' });
+		}
+
+		const supabase = createSupabaseServerClient(cookies);
+		const {
+			data: { user }
+		} = await supabase.auth.getUser();
+		if (!user) return fail(401, { listError: 'Du måste vara inloggad.' });
+
+		const form = await request.formData();
+		const listId = String(form.get('list_id') ?? '').trim();
+		if (!listId) return fail(400, { listError: 'Lista saknas.' });
+
+		const { error } = await supabase
+			.from('block_lists')
+			.delete()
+			.eq('id', listId)
+			.eq('created_by', user.id);
+
+		if (error) return fail(400, { listError: error.message });
+		return { listDeleted: true };
 	}
 };

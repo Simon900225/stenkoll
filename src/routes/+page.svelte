@@ -18,6 +18,7 @@
 	let selected: Block | null = $state(null);
 	let favoriteIds = $state(new Set<string>());
 	let favoriteBusy = $state(false);
+	let listsInitialized = $state(false);
 
 	let isMobile = $state(false);
 	let welcome = $state<{ show: () => void } | null>(null);
@@ -79,6 +80,23 @@
 	});
 
 	$effect(() => {
+		if (listsInitialized) return;
+		const raw = data.initialListIds ?? '';
+		if (!raw) {
+			listsInitialized = true;
+			return;
+		}
+		const ids = raw
+			.split(',')
+			.map((s: string) => s.trim())
+			.filter((s: string) => /^[0-9a-f-]{36}$/i.test(s));
+		if (ids.length) {
+			filters = { ...filters, listIds: [...new Set(ids)] };
+		}
+		listsInitialized = true;
+	});
+
+	$effect(() => {
 		const f = filters;
 		const b = bounds;
 		if (!b) return;
@@ -98,6 +116,25 @@
 			photoFilter: f.photoFilter,
 			favoritesOnly: f.favoritesOnly ? '1' : '0'
 		});
+		if (f.listIds.length) {
+			params.set('listIds', f.listIds.join(','));
+		}
+
+		// Keep shareable list selection in the address bar (without reload).
+		if (listsInitialized && typeof history !== 'undefined') {
+			const next = new URL(window.location.href);
+			if (f.listIds.length) next.searchParams.set('listIds', f.listIds.join(','));
+			else next.searchParams.delete('listIds');
+			const nextSearch = next.searchParams.toString();
+			const cur = new URL(window.location.href);
+			if (nextSearch !== cur.searchParams.toString()) {
+				history.replaceState(
+					history.state,
+					'',
+					`${next.pathname}${next.search ? `?${nextSearch}` : ''}${next.hash}`
+				);
+			}
+		}
 
 		fetch(`/api/blocks?${params}`, { signal: ac.signal })
 			.then(async (res) => {
@@ -132,6 +169,7 @@
 			width_m: null,
 			size_source: null,
 			developed: marker.developed,
+			list_id: marker.list_id ?? null,
 			created_by: null,
 			created_at: ''
 		};
@@ -177,6 +215,12 @@
 			favoriteBusy = false;
 		}
 	}
+
+	const listNameForSelected = $derived.by(() => {
+		const listId = selected?.list_id;
+		if (!listId) return null;
+		return (data.lists ?? []).find((l) => l.id === listId)?.name ?? null;
+	});
 
 	function closeSelection() {
 		selected = null;
@@ -252,6 +296,7 @@
 					<FilterPanel
 						compact
 						{filters}
+						lists={data.lists ?? []}
 						blockCount={markers.length}
 						{truncated}
 						{loading}
@@ -261,6 +306,7 @@
 			{#if selected}
 				<BlockPanel
 					block={selected}
+					listName={listNameForSelected}
 					embedded
 					favorited={favoriteIds.has(selected.id)}
 					canFavorite={Boolean(data.user) && !data.usingSeedData}
@@ -274,6 +320,7 @@
 				<FilterPanel
 					embedded
 					{filters}
+					lists={data.lists ?? []}
 					user={data.user}
 					usingSeedData={data.usingSeedData}
 					onchange={(f) => {
@@ -285,6 +332,7 @@
 	{:else}
 		<FilterPanel
 			{filters}
+			lists={data.lists ?? []}
 			user={data.user}
 			usingSeedData={data.usingSeedData}
 			onchange={(f) => {
@@ -294,6 +342,7 @@
 
 		<BlockPanel
 			block={selected}
+			listName={listNameForSelected}
 			favorited={selected ? favoriteIds.has(selected.id) : false}
 			canFavorite={Boolean(data.user) && !data.usingSeedData}
 			favoriteBusy={favoriteBusy}

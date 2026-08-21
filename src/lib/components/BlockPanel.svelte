@@ -7,11 +7,13 @@
 		googleMapsUrl,
 		lantmaterietFlygUrl,
 		scoreColor,
+		sourceLabel,
 		theTopoUrl
 	} from '$lib/blocks';
 
 	type Props = {
 		block: Block | null;
+		listName?: string | null;
 		favorited?: boolean;
 		canFavorite?: boolean;
 		favoriteBusy?: boolean;
@@ -23,6 +25,7 @@
 
 	let {
 		block,
+		listName = null,
 		favorited = false,
 		canFavorite = false,
 		favoriteBusy = false,
@@ -43,6 +46,7 @@
 				}
 			: null
 	);
+	const sourceText = $derived(block ? sourceLabel(block.source, listName) : '');
 </script>
 
 {#if block}
@@ -61,7 +65,7 @@
 		{/if}
 
 		<p class="meta">
-			<span class="source">{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
+			<span class="source">{sourceText}</span>
 			{#if block.developed}
 				<span class="badge">Utvecklad</span>
 			{/if}

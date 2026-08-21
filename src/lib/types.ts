@@ -1,9 +1,29 @@
-export type BlockSource = 'fornsok' | 'user';
+export type BlockSource = 'fornsok' | 'user' | 'list';
+
+export type BlockList = {
+	id: string;
+	name: string;
+	source_url: string;
+	google_list_id: string;
+	created_by: string;
+	created_at: string;
+};
+
+/** Catalog row for the map filter dropdown. */
+export type BlockListSummary = {
+	id: string;
+	name: string;
+	pin_count: number;
+	owner_display_name: string | null;
+	created_by: string;
+};
 
 export type Block = {
 	id: string;
 	source: BlockSource;
 	fornsok_id: string | null;
+	/** Set when source = 'list'; cascading delete with the list. */
+	list_id: string | null;
 	name: string;
 	description: string | null;
 	lamningstyp: string | null;
@@ -71,10 +91,13 @@ export type BlockFilters = {
 	minScore: number;
 	minHeight: number;
 	minArea: number;
+	/** Fornsök / Användare only — list pins use listIds. */
 	sources: BlockSource[];
 	photoFilter: PhotoFilter;
 	/** When true, only blocks the current user has favourited. */
 	favoritesOnly: boolean;
+	/** Imported list IDs to overlay on the map (off by default). */
+	listIds: string[];
 };
 
 /** Slim marker payload for viewport queries (no long text fields). */
@@ -83,6 +106,7 @@ export type BlockMarker = Pick<
 	| 'id'
 	| 'source'
 	| 'fornsok_id'
+	| 'list_id'
 	| 'name'
 	| 'lamningstyp'
 	| 'egenskapsvarde'
@@ -112,6 +136,7 @@ type Tables = {
 			id?: string;
 			source: BlockSource;
 			fornsok_id?: string | null;
+			list_id?: string | null;
 			name: string;
 			description?: string | null;
 			lamningstyp?: string | null;
@@ -136,6 +161,19 @@ type Tables = {
 			updated_at?: string;
 		};
 		Update: Partial<Tables['blocks']['Insert']>;
+		Relationships: [];
+	};
+	block_lists: {
+		Row: BlockList;
+		Insert: {
+			id?: string;
+			name: string;
+			source_url: string;
+			google_list_id: string;
+			created_by: string;
+			created_at?: string;
+		};
+		Update: Partial<Tables['block_lists']['Insert']>;
 		Relationships: [];
 	};
 	photos: {

@@ -49,6 +49,65 @@
 	</section>
 
 	<section class="card activity">
+		<h2>Dina listor</h2>
+		<p class="lead">
+			Importerade Google Maps-listor. Att radera en lista tar bort alla dess punkter.
+		</p>
+
+		{#if form?.listError}
+			<p class="err">{form.listError}</p>
+		{/if}
+		{#if form?.listDeleted}
+			<p class="ok">Listan är borttagen.</p>
+		{/if}
+
+		{#if data.lists.length === 0}
+			<p class="dim">
+				Inga listor ännu. <a href="/import">Importera från Google Maps</a>
+			</p>
+		{:else}
+			<ul class="list">
+				{#each data.lists as list (list.id)}
+					<li class="list-row">
+						<div class="list-main">
+							<a href="/?listIds={list.id}">{list.name}</a>
+							<span class="tags">
+								<span class="tag">{list.pinCount} st</span>
+							</span>
+						</div>
+						<form
+							method="POST"
+							action="?/deleteList"
+							use:enhance={() => {
+								return async ({ update }) => {
+									await update();
+								};
+							}}
+						>
+							<input type="hidden" name="list_id" value={list.id} />
+							<button
+								type="submit"
+								class="btn danger"
+								onclick={(e) => {
+									if (
+										!confirm(
+											`Radera «${list.name}» och alla ${list.pinCount} punkter?`
+										)
+									) {
+										e.preventDefault();
+									}
+								}}
+							>
+								Radera
+							</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card activity">
 		<h2>Favoriter</h2>
 		<p class="lead">Block du sparat att titta på senare.</p>
 
@@ -276,5 +335,35 @@
 		padding: 0.15rem 0.4rem;
 		border: 1px solid var(--line);
 		border-radius: 2px;
+	}
+
+	.list-row {
+		align-items: center !important;
+	}
+
+	.list-main {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.35rem 0.75rem;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.btn.danger {
+		background: transparent;
+		color: #8b2e2e;
+		border: 1px solid color-mix(in srgb, #8b2e2e 40%, var(--line));
+		padding: 0.35rem 0.55rem;
+		font-size: 0.8rem;
+	}
+
+	.btn.danger:hover {
+		background: color-mix(in srgb, #8b2e2e 12%, transparent);
+	}
+
+	.dim a {
+		color: var(--moss-deep);
+		font-weight: 600;
 	}
 </style>

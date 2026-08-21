@@ -7,6 +7,7 @@
 		googleMapsUrl,
 		lantmaterietFlygUrl,
 		scoreColor,
+		sourceLabel,
 		theTopoUrl
 	} from '$lib/blocks';
 
@@ -24,6 +25,7 @@
 		gokartor: gokartorUrl(block.lat, block.lng),
 		theTopo: theTopoUrl(block.lat, block.lng)
 	});
+	const sourceText = $derived(sourceLabel(block.source, data.listName ?? null));
 
 	type LightboxPhoto = { url: string; alt: string; caption: string | null };
 	let lightboxPhoto = $state<LightboxPhoto | null>(null);
@@ -65,7 +67,7 @@
 		</div>
 		<div>
 			<p class="meta">
-				<span>{block.source === 'fornsok' ? 'Fornsök' : 'Användare'}</span>
+				<span>{sourceText}</span>
 				{#if block.developed}
 					<span class="badge">Utvecklad</span>
 				{/if}

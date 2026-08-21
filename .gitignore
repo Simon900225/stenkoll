@@ -28,5 +28,9 @@ scripts/**/__pycache__/
 *.gpkg
 data/
 scripts/scoring_batches/
+scripts/rescore_out/
 
-/supabase
+# Local Supabase CLI state / generated junk — keep migrations + seed tracked
+/supabase/.temp
+/supabase/.branches
+/supabase/.temp/**

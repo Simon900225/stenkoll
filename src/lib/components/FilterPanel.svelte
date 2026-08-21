@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { BlockFilters, BlockSource, PhotoFilter } from '$lib/types';
+	import type { BlockFilters, BlockListSummary, BlockSource, PhotoFilter } from '$lib/types';
 	import type { User } from '@supabase/supabase-js';
 
 	type Props = {
 		filters: BlockFilters;
+		lists?: BlockListSummary[];
 		blockCount?: number;
 		user?: User | null;
 		truncated?: boolean;
@@ -18,6 +19,7 @@
 
 	let {
 		filters,
+		lists = [],
 		blockCount = 0,
 		user = null,
 		truncated = false,
@@ -28,12 +30,27 @@
 		onchange
 	}: Props = $props();
 
+	let listsOpen = $state(false);
+
+	$effect(() => {
+		if (filters.listIds.length > 0) listsOpen = true;
+	});
+
 	function toggleSource(source: BlockSource) {
+		if (source === 'list') return;
 		const has = filters.sources.includes(source);
 		const sources = has
 			? filters.sources.filter((s) => s !== source)
 			: [...filters.sources, source];
 		onchange?.({ ...filters, sources: sources.length ? sources : [source] });
+	}
+
+	function toggleList(listId: string) {
+		const has = filters.listIds.includes(listId);
+		const listIds = has
+			? filters.listIds.filter((id) => id !== listId)
+			: [...filters.listIds, listId];
+		onchange?.({ ...filters, listIds });
 	}
 
 	const chips = $derived.by(() => {
@@ -47,6 +64,7 @@
 		if (filters.photoFilter === 'with') items.push('Med bild');
 		if (filters.photoFilter === 'without') items.push('Utan bild');
 		if (filters.favoritesOnly) items.push('Favoriter');
+		if (filters.listIds.length) items.push(`${filters.listIds.length} listor`);
 		return items;
 	});
 </script>
@@ -147,6 +165,53 @@
 		</label>
 	</fieldset>
 
+	<div class="field lists-field">
+		<button
+			type="button"
+			class="lists-toggle"
+			aria-expanded={listsOpen}
+			onclick={() => (listsOpen = !listsOpen)}
+		>
+			<span>Listor</span>
+			<span class="lists-meta">
+				{#if filters.listIds.length}
+					{filters.listIds.length} på
+				{:else}
+					av
+				{/if}
+				· {listsOpen ? '▾' : '▸'}
+			</span>
+		</button>
+		{#if listsOpen}
+			{#if lists.length === 0}
+				<p class="lists-empty">
+					Inga importerade listor ännu.
+					{#if user}
+						<a href="/import">Importera</a>
+					{:else}
+						<a href="/auth">Logga in</a> för att importera.
+					{/if}
+				</p>
+			{:else}
+				<div class="lists">
+					{#each lists as list (list.id)}
+						<label class="check">
+							<input
+								type="checkbox"
+								checked={filters.listIds.includes(list.id)}
+								onchange={() => toggleList(list.id)}
+							/>
+							<span class="list-label">
+								<span class="list-name">{list.name}</span>
+								<span class="list-count">{list.pin_count} st</span>
+							</span>
+						</label>
+					{/each}
+				</div>
+			{/if}
+		{/if}
+	</div>
+
 	<label class="field">
 		<span>Bild</span>
 		<select
@@ -180,6 +245,7 @@
 	<nav class="links">
 		<a href="/add">Lägg till block</a>
 		{#if user}
+			<a href="/import">Importera lista</a>
 			<a href="/profile">Profil</a>
 		{:else}
 			<a href="/auth">Logga in</a>
@@ -318,6 +384,7 @@
 
 	.links {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.85rem;
 		margin-top: 0.85rem;
 		padding-top: 0.85rem;
@@ -333,6 +400,71 @@
 
 	.links a:hover {
 		color: var(--ink);
+	}
+
+	.lists-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		padding: 0;
+		border: none;
+		background: transparent;
+		font: inherit;
+		font-size: inherit;
+		text-transform: inherit;
+		letter-spacing: inherit;
+		color: inherit;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.lists-meta {
+		text-transform: none;
+		letter-spacing: 0;
+		font-size: 0.78rem;
+		color: var(--muted);
+	}
+
+	.lists {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin-top: 0.45rem;
+		max-height: 11rem;
+		overflow: auto;
+	}
+
+	.list-label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		min-width: 0;
+	}
+
+	.list-name {
+		font-size: 0.9rem;
+		line-height: 1.25;
+		word-break: break-word;
+	}
+
+	.list-count {
+		font-size: 0.75rem;
+		color: var(--muted);
+	}
+
+	.lists-empty {
+		margin: 0.45rem 0 0;
+		font-size: 0.8rem;
+		text-transform: none;
+		letter-spacing: 0;
+		color: var(--muted);
+		line-height: 1.35;
+	}
+
+	.lists-empty a {
+		color: var(--moss-deep);
+		font-weight: 600;
 	}
 
 	.peek {

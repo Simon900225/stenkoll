@@ -20,7 +20,7 @@ export function pinStyleFromBlock(block: BlockMarker): PinStyle {
 		fill: scoreColor(score),
 		label: score == null ? '?' : String(score),
 		ring: block.developed ? 'dev' : block.has_photo ? 'photo' : 'none',
-		user: block.source === 'user'
+		user: block.source === 'user' || block.source === 'list'
 	};
 }
 

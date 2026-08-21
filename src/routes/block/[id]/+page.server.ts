@@ -78,11 +78,22 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		isFavorite = Boolean(fav);
 	}
 
+	let listName: string | null = null;
+	if (resolved.list_id) {
+		const { data: listRow } = await supabase
+			.from('block_lists')
+			.select('name')
+			.eq('id', resolved.list_id)
+			.maybeSingle();
+		listName = listRow?.name ?? null;
+	}
+
 	return {
 		block: resolved,
 		photos: withUrls,
 		comments,
 		fornsokLink: fornsokUrl(resolved.fornsok_id),
+		listName,
 		isFavorite,
 		user,
 		usingSeedData: usingSeedData ?? false

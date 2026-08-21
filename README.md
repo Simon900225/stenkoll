@@ -112,9 +112,12 @@ python import_fornsok.py --gpkg path/to/lamningar.gpkg
 
 ## Datamodell (kort)
 
-- `blocks` — fornsok/user, koordinater, climb_score 1–5, beskrivning
+- `blocks` — fornsok/user/list, koordinater, climb_score 1–5, beskrivning
+- `block_lists` — importerade Google Maps-listor (publika, visa via filter)
 - `photos` — uppladdade bilder kopplade till block
 - `profiles` — display_name för inloggade användare
+
+Importera listor: `/import` (inloggad). Kör migrationen `supabase/migrations/20260821220000_block_lists.sql` mot ditt Supabase-projekt innan du använder funktionen.
 
 ## Licens / attribution
 

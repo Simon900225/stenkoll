@@ -13,10 +13,13 @@ export const DEFAULT_ZOOM = 10;
 export const VIEWPORT_BLOCK_LIMIT = 400;
 
 export const MARKER_COLUMNS =
-	'id, source, fornsok_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, height_m, area_m2, county, municipality, has_photo, developed' as const;
+	'id, source, fornsok_id, list_id, name, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, height_m, area_m2, county, municipality, has_photo, developed' as const;
 
 export const BLOCK_DETAIL_COLUMNS =
-	'id, source, fornsok_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, developed, created_by, created_at' as const;
+	'id, source, fornsok_id, list_id, name, description, lamningstyp, egenskapsvarde, lat, lng, climb_score, user_score, score_rationale, height_m, length_m, width_m, area_m2, size_source, county, municipality, has_photo, developed, created_by, created_at' as const;
+
+/** Cap markers for checked imported lists (separate from viewport cap). */
+export const LIST_BLOCK_LIMIT = 2000;
 
 /** Score shown on the map: user override when set, otherwise import/AI score. */
 export function effectiveScore(
@@ -30,6 +33,7 @@ export function toMarker(block: Block): BlockMarker {
 		id: block.id,
 		source: block.source,
 		fornsok_id: block.fornsok_id,
+		list_id: block.list_id,
 		name: block.name,
 		lamningstyp: block.lamningstyp,
 		egenskapsvarde: block.egenskapsvarde,
@@ -46,6 +50,15 @@ export function toMarker(block: Block): BlockMarker {
 	};
 }
 
+export function sourceLabel(
+	source: BlockSource,
+	listName?: string | null
+): string {
+	if (source === 'fornsok') return 'Fornsök';
+	if (source === 'list') return listName ? `Lista · ${listName}` : 'Lista';
+	return 'Användare';
+}
+
 export function filterBlocks(
 	blocks: Block[],
 	filters: BlockFilters,
@@ -57,11 +70,25 @@ export function filterBlocks(
 export function matchesFilters(
 	block: Pick<
 		Block,
-		'id' | 'climb_score' | 'user_score' | 'height_m' | 'area_m2' | 'source' | 'has_photo'
+		| 'id'
+		| 'climb_score'
+		| 'user_score'
+		| 'height_m'
+		| 'area_m2'
+		| 'source'
+		| 'has_photo'
+		| 'list_id'
 	>,
 	filters: BlockFilters,
 	favoriteIds?: ReadonlySet<string>
 ): boolean {
+	// Imported list pins: visible when their list is checked; ignore score/size/photo/source.
+	if (block.source === 'list') {
+		if (!block.list_id || !filters.listIds.includes(block.list_id)) return false;
+		if (filters.favoritesOnly && !(favoriteIds?.has(block.id) ?? false)) return false;
+		return true;
+	}
+
 	const score = effectiveScore(block) ?? 0;
 	if (score < filters.minScore) return false;
 	if (filters.minHeight > 0 && (block.height_m ?? 0) < filters.minHeight) return false;
@@ -187,6 +214,7 @@ export function defaultFilters(): BlockFilters {
 		minArea: 0,
 		sources: ['fornsok', 'user'] as BlockSource[],
 		photoFilter: 'all' as PhotoFilter,
-		favoritesOnly: false
+		favoritesOnly: false,
+		listIds: []
 	};
 }
